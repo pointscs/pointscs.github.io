@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="111.85mm" height="45.14mm" viewBox="0 0 317.04 127.97">
+  <defs>
+    <style>
+      .cls-1, .cls-3, .cls-4 {
+        fill: #fff;
+      }
+
+      .cls-2 {
+        fill: none;
+        stroke: #fff;
+        stroke-miterlimit: 10;
+        stroke-width: 2.24px;
+      }
+
+      .cls-3, .cls-4 {
+        font-size: 113.52px;
+        font-family: Montserrat-Light, Montserrat;
+        font-weight: 300;
+      }
+
+      .cls-3 {
+        letter-spacing: -0.03em;
+      }
+
+      .cls-4 {
+        letter-spacing: -0.03em;
+      }
+    </style>
+  </defs>
+  <g id="Layer_2" data-name="Layer 2">
+    <circle class="cls-1" cx="33.25" cy="64.91" r="30.84"/>
+    <line class="cls-2" x1="3.57" y1="64.35" x2="3.57" y2="125.33"/>
+    <text class="cls-3" transform="translate(65.42 94.84)">o</text>
+    <text class="cls-3" transform="translate(128.76 95.75)">i</text>
+    <text class="cls-4" transform="translate(151.2 95.75)">n</text>
+    <text class="cls-4" transform="translate(217.87 95.75)">t</text>
+    <text class="cls-4" transform="translate(263.53 95.75)">s</text>
+  </g>
+</svg>
