@@ -63,7 +63,8 @@
     p {
         font-family: "Montserrat", sans-serif;
         font-size: 1rem;
-        color:rgb(22, 22, 22);
+        font-weight: light;
+        color:rgb(34, 34, 34);
     }
 
     a {
@@ -75,7 +76,13 @@
         color: azure;
     }
     a:hover {
-        color:aquamarine
+        color:aquamarine;
+        
+    }
+    .a_reset {
+        color: azure;
+        padding-left: 0rem;
+        padding-right: 0rem;
     }
     .container {
         top: 5rem;
@@ -132,17 +139,26 @@
         color: azure;
     }
 
+    h3 {
+        font-family: "Montserrat", sans-serif;
+        font-size: 2.5rem;
+        font-weight: 800;
+        color: #5aa9aa;
+    }
+
+    h4 {
+        font-family: "Montserrat", sans-serif;
+        font-size: 2.5rem;
+        font-weight: bold;
+        color: azure;
+    }
+
     .btn {
         font-size: 1.2rem;
         margin:1rem;
         background-color: #6bc3c5;
         color: azure;
         border-radius: 0.3rem;
-    }
-    .system_screen {
-        width: 100%;
-        height: 70vh;
-        background-color: azure;
     }
     
 
@@ -164,7 +180,7 @@
 
     .content {
         position: relative;
-        width: 50%;
+        width: 60%;
         align-self: center;
         margin: auto;
         display: flex;
@@ -179,6 +195,26 @@
         margin:1rem;
     }
 
+    .main_color_bg {
+        background-color: #90d0d5;
+    }
+
+    .secondary_color_bg {
+        background-color: #6bc3c5;
+    }
+
+    .main_color_text {
+        color: #90d0d5;
+    }
+
+    .secondary_color_text {
+        color: #6bc3c5;
+    }
+
+    .white_text {
+        color: azure;
+    }
+
 
   </style>
   <body>
@@ -187,8 +223,8 @@
             <a href="#home_screen" class="home"><img class="points_home" src="./src/points_home.svg" alt="Points light logo">
             </a>
             <div class="menu_item"><a href="#system_screen">The System</a></div>
-            <div class="menu_item"><a href=".home">Learn</a></div>
-            <div class="menu_item"><a href=".home">Get Involved</a></div>
+            <div class="menu_item"><a href="#about_us">About Us</a></div>
+            <div class="menu_item"><a href="#learn">Learn</a></div>
             <div class="menu_item"><a href=".home">Contacts</a></div>
         </div>
     </div>
@@ -204,27 +240,93 @@
             </div>
         </div>
 
-        <div class="content_container">
+        
+
+        <div class="content_container" id="system_screen">
+            <center><h3>The System:</h3></center>
             <div class="content">
                 <div class="img">
-                    <img class="img" src="data:image/jpeg;base64,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" alt="Points light logo">
+                    <img class="img" src="./src/1.jpg" alt="table with adults using the points notation">
                 </div>
-                <div class="text_container">
-                    <div><h1>The system:</h1></div>
-                    <div><p>Remove overflow: hidden; property from custom-wrapper class and it will be shown. Although I am not sure if menu on large screen is ...
-                    </p></div>
-                    <div><a href="#" class="btn">discover more!</a></div>
-                </div>
+                <div class="text_container"><p>Points CS is a project that aims to empower occupational therapists by giving them tools to teach
+                    <br>movement in a fun, cheap, and effective way.<br>
+                    <br>The project is based on Points Notation, a way of writing movement invented by us. Using this
+                    <br>easily learnable notation you'll have both access to an infinite variety of moves and to a clear idea
+                    <br>of how to organize these moves depending on your patient's needs and wants.<br>
+                    <br>Because we want Points to arrive to as many people as possible, we've made it highly adaptable.
+                    <br>There's no need for special objects, screens or spaces: all you need is a couple of lessons (which
+                    <br>can be taken online) and our Blocks (which you can even download and print by yourself if the
+                    <br>expedition of the material is a problem).<br>
+                    <br>We want to help you help.
+                    <br>Let's do it.
+                    <br>Point.</p></div>
             </div>
         </div>
 
-        <div class="system_screen" id="system_screen">
-            <div class="system_container"></div>
+
+        <div class="content_container main_color_bg" id="about_us">
+            <center><h3>About Us:</h3></center>
+            <div class="content">
+                <div class="text_container"><p>Lucas Zileri is a professional juggler. As a student he studied in ESAC (Belgium) and did
+                    postgraduate studies guided by Jay Gilligan in DOCH (Sweden).<br><br>
+                    As an artist he has performed in more than 10 different countries and collaborated widely with
+                    both circus artists and musicians. As a teacher he has taught in professional and non-professional
+                    circus schools and has given one-on-one guidance to jugglers of every level.<br><br>
+                    Currently he's an artistic collaborator of Quattrox4 Circus Laboratory, helps
+                    organize Effective Altruism Italy and does this project.<br>
+                    You can follow him in IG <a class="a_reset" href="instagram.com/lucas_zileri">here</a></p></div>
+                    <div class="img"><img src="./src/lucas.jpg" alt="Lucas Zileri"></div>
+            </div>
+            <div class="content">
+                <div class="img"><img src="./src/shawn.jpg" alt="Shawn Pinciara"></div>
+                <div class="text_container"><p>Shawn Pinciara is a soon-to-be-graduate computer science for the digital communicazion student and juggling geek.<br>
+                He is also one of the many ninjas of the internet, as he collaborated in many circus projects (Such as the developmente of HTN notation, the European Juggling Convention and more)<br>
+                as well as many programmimg projects, but lives in the shadows always behind the scenes.<br>
+                Shawn's favorite thing is aestethics and colors, you can follow his journey <a class="a_reset" href="instagram.com/shawnpinciara">here</a>
+                </p> </div>
+            </div>
         </div>
 
-        <div class="content_container">
+        <div class="content_container" id="learn">
+            <center><h3>Learn</h3></center>
             <div class="content">
-                <div class="image"></div>
+                <div class="text_container"> <p>
+                    Points CS Standard Course<br>
+                    Objective:<br>
+                    We'll teach you the notation and the method. We'll then guide you through the creation of a
+                    program specially tailored to your target audience and help you implement it.<br><br>
+                    Duration: 6 hours of lessons (four sessions of 1h30m each) + homework.<br>
+                    Cost: 300€ (discount available for group lessons)<br>
+                    What you'll get:<br>
+                    Understanding of how to read and create Points' sequences
+                    Lifetime access to all the material
+                    Your own personalized program<br><br>
+                    Program:<br>
+                    First session – How to read Points Notation<br>
+                    Second session – How to create your own sequences<br>
+                    Third session – Creating a personalized program<br>
+                    Fourth session – After you've implemented the program we'll discuss how
+                    it went and make adjustments together.<br>
+                    After this, you'll be able to write us a mail asking for advice for the next six months.
+                </p></div>
+                <div class="img"><img class="img" src="./src/2.jpg" alt=""></div>
+            </div>
+            <div class="content">
+                <div class="img"><img class="img" src="./src/1.jpg" alt=""></div>
+                <div class="text_container"><p>
+                    Or tell us how we can help you!<br>
+                    We'd love to know how we can make a proposal that fits your need. Are you a PE teacher that's
+                    looking for a fun and original PE class? A company seeking a team-building activity? A circus
+                    company trying to compose a new sequence for their show?<br><br>
+                    Write or call us and we'll find a way of doing it.
+                </p></div>
+            </div>
+        </div>
+
+        <div class="content_container" id="">
+            <center><h3></h3></center>
+            <div class="content">
+                <div class="img"></div>
                 <div class="text_container"></div>
             </div>
         </div>
