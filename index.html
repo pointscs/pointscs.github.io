@@ -110,8 +110,57 @@
        
     }
 
+    .img_container {
+        width: 100%;
+        display: flex;
+        justify-content: center;
+    }
+
+    .system_image {
+        margin: 2rem;
+        border-radius: 1rem;
+        background-image: url("./src/1.jpg");
+        background-position: center;
+        background-repeat: no-repeat;
+        background-size: cover;
+        position: relative;
+    }
+
+    .learn_image {
+        margin: 2rem;
+        border-radius: 1rem;
+        background-image: url("./src/2.jpg");
+        background-position: center right;
+        background-repeat: no-repeat;
+        background-size: cover;
+        position: relative;
+    }
+
+    .lucas_image {
+        
+        border-radius: 2rem;
+        background-image: url("./src/lucas.png");
+        background-position: center;
+        background-repeat: no-repeat;
+        background-size: cover;
+        position: relative;
+    }
+
+    .shawn_image {
+        border-radius: 1rem;
+        margin-right: 2rem;
+        margin-left: 1rem;
+        background-image: url("./src/shawn.png");
+        background-position: center top;
+        background-repeat: no-repeat;
+        background-size: cover;
+        position: relative;
+    }
+
     .img {
         width: 100%;
+        height: min-content;
+        object-fit: cover;
         border-radius: 1rem;
     }
     .logo{
@@ -178,6 +227,15 @@
         background-color: azure;
     }
 
+    .footer {
+        position: relative;
+        bottom: 0px;
+        width: 100%;
+        padding-top: 4rem;
+        height: 10vh;
+        background-color: azure;
+    }
+
     .content {
         position: relative;
         width: 60%;
@@ -186,6 +244,7 @@
         display: flex;
         flex-direction: row;
         justify-content: space-evenly;
+        
     }
 
     .text_container {
@@ -225,7 +284,7 @@
             <div class="menu_item"><a href="#system_screen">The System</a></div>
             <div class="menu_item"><a href="#about_us">About Us</a></div>
             <div class="menu_item"><a href="#learn">Learn</a></div>
-            <div class="menu_item"><a href=".home">Contacts</a></div>
+            <div class="menu_item"><a href="#donate">Donate</a></div>
         </div>
     </div>
     <a href="#home_screen"><img class="go_to_top" src="./src/go_to_top_lightblue.svg" alt="Points light logo">
@@ -245,8 +304,7 @@
         <div class="content_container" id="system_screen">
             <center><h3>The System:</h3></center>
             <div class="content">
-                <div class="img">
-                    <img class="img" src="./src/1.jpg" alt="table with adults using the points notation">
+                <div class="img_container system_image">
                 </div>
                 <div class="text_container"><p>Points CS is a project that aims to empower occupational therapists by giving them tools to teach
                     <br>movement in a fun, cheap, and effective way.<br>
@@ -275,10 +333,10 @@
                     Currently he's an artistic collaborator of Quattrox4 Circus Laboratory, helps
                     organize Effective Altruism Italy and does this project.<br>
                     You can follow him in IG <a class="a_reset" href="instagram.com/lucas_zileri">here</a></p></div>
-                    <div class="img"><img src="./src/lucas.jpg" alt="Lucas Zileri"></div>
+                <div class="img_container lucas_image"></div>
             </div>
             <div class="content">
-                <div class="img"><img src="./src/shawn.jpg" alt="Shawn Pinciara"></div>
+                <div class="img_container shawn_image"></div>
                 <div class="text_container"><p>Shawn Pinciara is a soon-to-be-graduate computer science for the digital communicazion student and juggling geek.<br>
                 He is also one of the many ninjas of the internet, as he collaborated in many circus projects (Such as the developmente of HTN notation, the European Juggling Convention and more)<br>
                 as well as many programmimg projects, but lives in the shadows always behind the scenes.<br>
@@ -307,29 +365,33 @@
                     Third session – Creating a personalized program<br>
                     Fourth session – After you've implemented the program we'll discuss how
                     it went and make adjustments together.<br>
-                    After this, you'll be able to write us a mail asking for advice for the next six months.
-                </p></div>
-                <div class="img"><img class="img" src="./src/2.jpg" alt=""></div>
-            </div>
-            <div class="content">
-                <div class="img"><img class="img" src="./src/1.jpg" alt=""></div>
-                <div class="text_container"><p>
-                    Or tell us how we can help you!<br>
+                    After this, you'll be able to write us a mail asking for advice for the next six months.<br><br>
+                    <b>Or tell us how we can help you!</b><br>
                     We'd love to know how we can make a proposal that fits your need. Are you a PE teacher that's
                     looking for a fun and original PE class? A company seeking a team-building activity? A circus
                     company trying to compose a new sequence for their show?<br><br>
                     Write or call us and we'll find a way of doing it.
                 </p></div>
+                <div class="img_container learn_image"></div>
             </div>
         </div>
 
-        <div class="content_container" id="">
+
+        <!-- <div class="footer main_color_bg" id="donate">
+            <center><h3></h3></center>
+            <div class="content">
+                <div class="text_container"><p>aaaaaaaaa</p></div>
+                <div class="text_container"><p>aaaaaaaaaaaa</p></div>
+            </div>
+        </div> -->
+
+        <!-- <div class="content_container" id="">
             <center><h3></h3></center>
             <div class="content">
                 <div class="img"></div>
                 <div class="text_container"></div>
             </div>
-        </div>
+        </div> -->
     
 </body>
     
