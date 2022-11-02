@@ -50,16 +50,17 @@
         color: white;
     }
 
-    .home {
+    .menu_hamburger {
+        font-family: "Montserrat", sans-serif;
+        font-size: 2rem;
         align-self: center;
-        position: fixed;
-        left:5rem;
+        color: white;
     }
 
+
+
     .points_home {
-        height: 3rem;
-        padding-right: 3rem;
-        align-self: center;
+        height: 3rem;    
     }
 
     p {
@@ -108,8 +109,6 @@
         margin: auto;
         display: flex;
         flex-direction: row;
-
-       
     }
 
     .img_container {
@@ -248,6 +247,17 @@
         
     }
 
+    .content_vertical {
+        position: relative;
+        width: 100%;
+        align-self: center;
+        margin: auto;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-evenly;
+        
+    }
+
     .content_start {
         position: relative;
         width: 60%;
@@ -292,12 +302,54 @@
     .white_text {
         color: azure;
     }
-    .diplay {
+
+    .hamburger_icon {
         color: azure;
         width: 2rem;
+        display: none;
     }
 
-    @media (max-height: 700px) {
+    /* Mobile view: */
+    @media only screen and (max-width: 900px) {
+        
+        .menu {
+            flex-direction: column;
+            flex-wrap:nowrap;
+            justify-content: center;
+        }
+
+        .home_menu_item {
+            background-color: #6bc3c5;
+            padding-top: 2rem;
+        }
+
+        .menu_item {
+            color: black;
+        }
+
+        .menu_container {
+            height: 9rem;
+        }
+
+        .hamburger_icon {
+            background-color: #6bc3c5;
+        }
+
+        .splashscreen_container{
+            width: 90%;
+            align-self: center;
+            margin: auto;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .logo { 
+            margin: auto;
+        }
+
+        .content {
+            flex-direction: column;
+        }
 
     }
 
@@ -306,13 +358,15 @@
   <body>
     <div class="menu_container">
         <div class="menu">
-            <a href="#home_screen" class="home"><img class="points_home" src="./src/points_home.svg" alt="Points light logo">
-            </a>
+            <div class="menu_item home_menu_item">
+                <a href="#home_screen"><img class="points_home" src="./src/points_home.svg" alt="Points light logo">
+                </a>
+            </div>  
             <div class="menu_item"><a href="#system_screen">The System</a></div>
             <div class="menu_item"><a href="#about_us">About Us</a></div>
             <div class="menu_item"><a href="#learn">Learn</a></div>
             <div class="menu_item"><a href="#donate">Donate</a></div>
-            <div class="menu_item"><a href="#diplay" class="display"><img class="display" src="./src/menu.svg" alt="Points light logo"></a></div>
+            <div class="menu_hamburger"><a href="#display" class="display"><img class="hamburger_icon" src="./src/menu.svg" alt="Points light logo"></a></div>
         </div>
     </div>
     <a href="#home_screen"><img class="go_to_top" src="./src/go_to_top_lightblue.svg" alt="Points light logo">
