@@ -11,6 +11,12 @@
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@48,400,0,0" />
   </head>
   <style type="text/css">
+    :root {
+    --lucas: url("https://raw.githubusercontent.com/shawnpinciara/PointsWebsite/faf0363e4dcf59edb9915226695600d2724e5d31/src/lucas.png");
+    --shawn: url("https://raw.githubusercontent.com/shawnpinciara/PointsWebsite/faf0363e4dcf59edb9915226695600d2724e5d31/src/shawn.png");
+    --system:url("https://raw.githubusercontent.com/shawnpinciara/PointsWebsite/faf0363e4dcf59edb9915226695600d2724e5d31/src/1.jpg");
+    --learn:url("https://raw.githubusercontent.com/shawnpinciara/PointsWebsite/faf0363e4dcf59edb9915226695600d2724e5d31/src/2.jpg");
+    }
     html, body {
         padding: 0;
         margin:0;
@@ -52,9 +58,10 @@
 
     .menu_hamburger {
         font-family: "Montserrat", sans-serif;
-        font-size: 2rem;
+        font-size: 3rem;
         align-self: center;
-        color: white;
+        color: black;
+        display: none;
     }
 
 
@@ -120,7 +127,7 @@
     .system_image {
         margin: 2rem;
         border-radius: 1rem;
-        background-image: url("./src/1.jpg");
+        background-image: var(--system);
         background-position: center;
         background-repeat: no-repeat;
         background-size: cover;
@@ -130,7 +137,7 @@
     .learn_image {
         margin: 2rem;
         border-radius: 1rem;
-        background-image: url("./src/2.jpg");
+        background-image: var(--learn);
         background-position: center right;
         background-repeat: no-repeat;
         background-size: cover;
@@ -138,10 +145,11 @@
     }
 
     .lucas_image {
-        
-        border-radius: 2rem;
-        background-image: url("./src/lucas.png");
-        background-position: center;
+        border-radius: 1rem;
+        margin-right: 2rem;
+        margin-left: 1rem;
+        background-image: var(--lucas);
+        background-position: center top;
         background-repeat: no-repeat;
         background-size: cover;
         position: relative;
@@ -151,7 +159,7 @@
         border-radius: 1rem;
         margin-right: 2rem;
         margin-left: 1rem;
-        background-image: url("./src/shawn.png");
+        background-image: var(--shawn);
         background-position: center top;
         background-repeat: no-repeat;
         background-size: cover;
@@ -163,6 +171,7 @@
         height: min-content;
         object-fit: cover;
         border-radius: 1rem;
+        margin: auto;
     }
     .logo{
         width: 15rem;
@@ -194,6 +203,7 @@
         font-size: 2.5rem;
         font-weight: 800;
         color: #5aa9aa;
+        padding-top: 2rem;
     }
 
     h4 {
@@ -222,7 +232,6 @@
 
     .content_container {
         width: 100%;
-        padding-top: 1rem;
         padding-bottom: 3rem;
         height: auto;
         background-color: azure;
@@ -230,7 +239,7 @@
 
     .footer {
         position:relative;
-        margin-top: 20px;
+        
         bottom:0;
         left:0;
         width:100%;
@@ -303,15 +312,23 @@
         color: azure;
     }
 
-    .hamburger_icon {
-        color: azure;
-        width: 2rem;
-        display: none;
+    .bg {
+        background-color: rgb(20, 211, 55);
+    }
+
+    .logo_container {
+        display:flex;
+        flex-direction: row;
+        flex-wrap: wrap;
+        justify-content: center;
     }
 
     /* Mobile view: */
-    @media only screen and (max-width: 900px) {
+    @media only screen and (max-width: 1000px) {
         
+        a {
+            font-size: 1.2rem;
+        }
         .menu {
             flex-direction: column;
             flex-wrap:nowrap;
@@ -320,7 +337,7 @@
 
         .home_menu_item {
             background-color: #6bc3c5;
-            padding-top: 2rem;
+            padding-top: 0.2rem;
         }
 
         .menu_item {
@@ -328,12 +345,9 @@
         }
 
         .menu_container {
-            height: 9rem;
+            height: 9.8rem;
         }
 
-        .hamburger_icon {
-            background-color: #6bc3c5;
-        }
 
         .splashscreen_container{
             width: 90%;
@@ -344,11 +358,29 @@
         }
 
         .logo { 
-            margin: auto;
+            
         }
 
         .content {
             flex-direction: column;
+            width: 80%;
+        }
+
+        .img_container {
+            width: 100%;
+            height: 30vh;
+            display: flex;
+            justify-content: center;
+            padding-left: 0px;
+        }
+
+        .learn_image, .system_image, .shawn_image, .lucas_image {
+            margin:0px;
+        }
+
+        .lucas_image {
+            padding-bottom: 2rem;
+            margin-bottom: 2rem;
         }
 
     }
@@ -359,23 +391,25 @@
     <div class="menu_container">
         <div class="menu">
             <div class="menu_item home_menu_item">
-                <a href="#home_screen"><img class="points_home" src="./src/points_home.svg" alt="Points light logo">
+                <a href="#home_screen"><img class="points_home" src="https://raw.githubusercontent.com/shawnpinciara/PointsWebsite/faf0363e4dcf59edb9915226695600d2724e5d31/src/points_home.svg" alt="Points light logo">
                 </a>
             </div>  
             <div class="menu_item"><a href="#system_screen">The System</a></div>
             <div class="menu_item"><a href="#about_us">About Us</a></div>
             <div class="menu_item"><a href="#learn">Learn</a></div>
             <div class="menu_item"><a href="#donate">Donate</a></div>
-            <div class="menu_hamburger"><a href="#display" class="display"><img class="hamburger_icon" src="./src/menu.svg" alt="Points light logo"></a></div>
+            <div class="menu_item"><a href="#display" class="menu_hamburger"><img class="hamburger_icon" src="https://raw.githubusercontent.com/shawnpinciara/PointsWebsite/faf0363e4dcf59edb9915226695600d2724e5d31/menu.svg" alt="Points light logo"></a></div>
         </div>
     </div>
-    <a href="#home_screen"><img class="go_to_top" src="./src/go_to_top_lightblue.svg" alt="Points light logo">
+    <a href="#home_screen"><img class="go_to_top" src="https://raw.githubusercontent.com/shawnpinciara/PointsWebsite/faf0363e4dcf59edb9915226695600d2724e5d31/src/go_to_top.svg" alt="Points light logo">
     </a>
     
     <div class="home_screen" id="home_screen">
             <div class="splashscreen_container">
-                <div class="img">
-                    <img class="logo" src="./src/logo_chiaro.svg" alt="Points light logo">
+                <div class="logo_container">
+                    <div class="img">
+                        <img class="logo" src="https://raw.githubusercontent.com/shawnpinciara/PointsWebsite/faf0363e4dcf59edb9915226695600d2724e5d31/src/logo_chiaro.svg" alt="Points light logo">
+                    </div>
                 </div>
                 <div class="text"><h2>Points CS is a project that aims to empower occupational therapists by giving them tools to teach movement in a fun, cheap, and effective way.</h2></div>
             </div>
