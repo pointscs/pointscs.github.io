@@ -1,0 +1,379 @@
+
+    :root {
+    --lucas: url("./src/lucas.png");
+    --shawn: url("./src/shawn.png");
+    --system:url("./src/1.jpg");
+    --learn:url("./src/2.jpg");
+    }
+    html, body {
+        padding: 0;
+        margin:0;
+        height: 100%;
+        scroll-behavior: smooth;
+        background-color: azure;
+    }
+    .menu_container {
+        width: 100%;
+        height: 5rem;
+        background-color: #6bc3c5;
+        box-shadow: 0 1px 5px rgba(0,0,0,0.12), 0 1px 2px rgba(0,0,0,0.24);
+        padding:0;
+        position: fixed;
+        top: 0;
+        overflow: hidden;
+        z-index: 99;
+    }
+    .menu {
+        /*flex*/
+        display: flex;
+        flex-direction: row;
+        flex-wrap: wrap;
+        justify-content: flex-end;
+        /*look and feel*/
+        margin: auto;
+        width: 80%;
+        height:100%;
+    }
+
+    .menu_item {
+        font-family: "Montserrat", sans-serif;
+        font-size: 1rem;
+        padding-left: 1rem;
+        padding-right: 1rem;
+        align-self: center;
+        color: white;
+    }
+
+    .menu_hamburger {
+        font-family: "Montserrat", sans-serif;
+        font-size: 3rem;
+        align-self: center;
+        color: black;
+        display: none;
+    }
+
+
+
+    .points_home {
+        height: 3rem;    
+    }
+
+    p {
+        font-family: "Montserrat", sans-serif;
+        font-size: 1rem;
+        font-weight: light;
+        color:rgb(34, 34, 34);
+    }
+
+    a {
+        text-decoration: none;
+        font-family: "Montserrat", sans-serif;
+        font-size: 1rem;
+        padding-left: 1rem;
+        padding-right: 1rem;
+        color: azure;
+    }
+    a:hover {
+        color:aquamarine;
+        
+    }
+    .a_reset {
+        color: azure;
+        padding-left: 0rem;
+        padding-right: 0rem;
+    }
+    .container {
+        top: 5rem;
+        width: 100%;
+        height: 10000px;
+        display: flex;
+        flex-direction: column;
+        background-color: #90d0d5;
+    }
+
+    .home_screen {
+        width: 100%;
+        height: 100vh;
+        background-color: #90d0d5;
+    }
+    .splashscreen_container{
+        position: relative;
+        top: 30%;
+        width: 35%;
+        align-self: center;
+        margin: auto;
+        display: flex;
+        flex-direction: row;
+    }
+
+    .img_container {
+        width: 100%;
+        display: flex;
+        justify-content: center;
+    }
+
+    .system_image {
+        margin: 2rem;
+        border-radius: 1rem;
+        background-image: var(--system);
+        background-position: center;
+        background-repeat: no-repeat;
+        background-size: cover;
+        position: relative;
+    }
+
+    .learn_image {
+        margin: 2rem;
+        border-radius: 1rem;
+        background-image: var(--learn);
+        background-position: center right;
+        background-repeat: no-repeat;
+        background-size: cover;
+        position: relative;
+    }
+
+    .lucas_image {
+        border-radius: 1rem;
+        margin-right: 2rem;
+        margin-left: 1rem;
+        background-image: var(--lucas);
+        background-position: center top;
+        background-repeat: no-repeat;
+        background-size: cover;
+        position: relative;
+    }
+
+    .shawn_image {
+        border-radius: 1rem;
+        margin-right: 2rem;
+        margin-left: 1rem;
+        background-image: var(--shawn);
+        background-position: center top;
+        background-repeat: no-repeat;
+        background-size: cover;
+        position: relative;
+    }
+
+    .img {
+        width: 100%;
+        height: min-content;
+        object-fit: cover;
+        border-radius: 1rem;
+        margin: auto;
+    }
+
+    .logo_home {
+        width: 15rem;
+        height: 15rem;
+        padding-right: 3rem;
+    }
+
+    .text_home {
+        align-self: center;
+        font-stretch: expanded;
+    }
+
+    h1 {
+        font-family: "Montserrat", sans-serif;
+        font-size: 2rem;
+        font-weight: bold;
+        color:rgb(22, 22, 22);
+    }
+
+    h2 {
+        font-family: "Montserrat", sans-serif;
+        font-size: 1.5rem;
+        font-weight: lighter;
+        color: azure;
+    }
+
+    h3 {
+        font-family: "Montserrat", sans-serif;
+        font-size: 2.5rem;
+        font-weight: 800;
+        color: #5aa9aa;
+        padding-top: 2rem;
+    }
+
+    h4 {
+        font-family: "Montserrat", sans-serif;
+        font-size: 2.5rem;
+        font-weight: bold;
+        color: azure;
+    }
+
+    .btn {
+        font-size: 1.2rem;
+        margin:1rem;
+        background-color: #6bc3c5;
+        color: azure;
+        border-radius: 0.3rem;
+    }
+    
+
+    .go_to_top {
+        position: fixed;
+        bottom: 2.5rem;
+        right: 2.5rem;
+        color: azure;
+        height: 2rem;
+    }
+
+    .content_container {
+        width: 100%;
+        padding-bottom: 3rem;
+        height: auto;
+        background-color: azure;
+    }
+
+    .footer {
+        position:relative;
+        
+        bottom:0;
+        left:0;
+        width:100%;
+    }
+
+    .content {
+        position: relative;
+        width: 60%;
+        align-self: center;
+        margin: auto;
+        display: flex;
+        flex-direction: row;
+        justify-content: space-evenly;
+        
+    }
+
+    .content_vertical {
+        position: relative;
+        width: 100%;
+        align-self: center;
+        margin: auto;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-evenly;
+        
+    }
+
+    .content_start {
+        position: relative;
+        width: 60%;
+        align-self: center;
+        margin: auto;
+        display: flex;
+        flex-direction: row;
+        justify-content: flex-start;
+        
+    }
+
+    .text_container {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        margin:1rem;
+    }
+
+    .text_container_left {
+        display: flex;
+        flex-direction: column;
+        align-self: flex-start;
+        margin:1rem;
+    }
+
+    .main_color_bg {
+        background-color: #90d0d5;
+    }
+
+    .secondary_color_bg {
+        background-color: #6bc3c5;
+    }
+
+    .main_color_text {
+        color: #90d0d5;
+    }
+
+    .secondary_color_text {
+        color: #6bc3c5;
+    }
+
+    .white_text {
+        color: azure;
+    }
+
+    .bg {
+        background-color: rgb(20, 211, 55);
+    }
+
+    .logo_container {
+        display:flex;
+        flex-direction: row;
+        flex-wrap: wrap;
+        justify-content: center;
+    }
+
+    /* Mobile view: */
+    @media only screen and (max-width: 1000px) {
+        
+        a {
+            font-size: 1.2rem;
+        }
+        .menu {
+            flex-direction: column;
+            flex-wrap:nowrap;
+            justify-content: center;
+        }
+
+        .home_menu_item {
+            background-color: #6bc3c5;
+            padding-top: 0.2rem;
+        }
+
+        .menu_item {
+            color: black;
+        }
+
+        .menu_container {
+            height: 9.8rem;
+        }
+
+        .logo_home {
+            padding-right: 0rem;
+        }
+
+
+        .splashscreen_container{
+            width: 90%;
+            align-self: center;
+            margin: auto;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .logo { 
+            
+        }
+
+        .content {
+            flex-direction: column;
+            width: 80%;
+        }
+
+        .img_container {
+            width: 100%;
+            height: 30vh;
+            display: flex;
+            justify-content: center;
+            padding-left: 0px;
+        }
+
+        .learn_image, .system_image, .shawn_image, .lucas_image {
+            margin:0px;
+        }
+
+        .lucas_image {
+            padding-bottom: 2rem;
+            margin-bottom: 2rem;
+        }
+
+    }
