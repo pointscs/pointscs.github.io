@@ -215,8 +215,9 @@
         position: fixed;
         bottom: 2.5rem;
         right: 2.5rem;
-        color: azure;
         height: 2rem;
+        z-index:98;
+        filter: invert(78%) sepia(14%) saturate(1130%) hue-rotate(132deg) brightness(90%) contrast(85%);
     }
 
     .content_container {
