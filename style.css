@@ -126,7 +126,7 @@
         margin: 2rem;
         border-radius: 1rem;
         background-image: var(--learn);
-        background-position: center right;
+        background-position: center left;
         background-repeat: no-repeat;
         background-size: cover;
         position: relative;
@@ -314,7 +314,7 @@
     }
 
     /* Mobile view: */
-    @media only screen and (max-width: 1000px) {
+    @media only screen and (max-width: 1200px) {
         
         a {
             font-size: 1.2rem;
