@@ -237,7 +237,7 @@
 
     .content {
         position: relative;
-        width: 60%;
+        width: 75%;
         align-self: center;
         margin: auto;
         display: flex;
@@ -314,7 +314,7 @@
     }
 
     /* Mobile view: */
-    @media only screen and (max-width: 1200px) {
+    @media only screen and (max-width: 950px) {
         
         a {
             font-size: 1.2rem;
