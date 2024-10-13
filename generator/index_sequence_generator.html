@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="">
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Caterpillar Notation Maker</title>
+  <link rel="preconnect" href="https://fonts.gstatic.com">
+  <link href="https://fonts.googleapis.com/css2?family=BenchNine:wght@300&display=swap" rel="stylesheet">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.16.0/umd/popper.min.js"></script>
+  <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.4.1/css/bootstrap.min.css"
+        integrity="sha384-Vkoo8x4CGsO3+Hhxv8T/Q5PaXtkKtu6ug5TOeNV6gBiFeWPGFN9MuhOf23Q9Ifjh" crossorigin="anonymous" />
+  <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.2.0/p5.js"></script>
+  <!--<script src="p5.sound.js"></script>-->
+  
+  <!--<script src="script.js"></script>-->
+</head>
+
+<body>
+  <!-- canvas -->
+  <div>   
+    <main>
+    </main>
+  </div>
+
+</body>
+<script>
+
+    //VARIABLES
+
+  rectanles = [];
+  subSequences = [];
+  const text_size = 100;
+  showIntroScreen = true;
+  var spaces = [1,1,1,0];
+  var lettersList = ['A','B','C','D'];
+  let bgColor;
+  let holeIndex = 3;
+  let currentIndex = 0;
+  let nextIndex = 3;
+  let first_time =true;
+  let pause = false;
+
+  const bpm = 60; //1 beat al secondo
+  const bpmMs = (60/bpm)*1000;
+  const tempo_up = 4;
+  const tempo_down = 4;
+
+  var beat_start = 0;
+  var beat_count = 0; // 0,1,2,3 and repeat
+  var beat_relative_millis = 0; //dice i ms ma ogni volta riparte da 0
+  var beat_time;
+  var time = 0;
+  var duration = 100 + time;
+  var oneTime = true;
+  var shift = 0;
+
+  var sequence ='';
+  var seqLength = 8;
+
+  function preload() {
+    //clac = loadSound('clac.mp3');
+  }
+
+  function setup() {
+    canvas = createCanvas(windowWidth, windowHeight);
+    frameRate(24);
+    generateSequence(seqLength);
+  }
+
+
+  $(function () {
+    console.log("dom ready!");
+  });
+
+  
+  function draw() {
+    // beat_time = millis();
+    bg();
+    sequenceTextDraw();
+    // currentLetter();
+    // nextLetter();
+    //console.log(counter);
+    //shift-=10;
+    // if(beat_time >= time && oneTime == true) {
+    //   shift+=100;
+    // }
+    // if(beat_time >= duration) {
+    //   duration += bpmMs;
+    //   oneTime == true;
+    // }
+
+    // if(beat_time >= time && oneTime == true) {
+    //   //on();
+      
+    //   //console.log(spaces)
+    //   console.log(spaces);
+    //   [spaces[currentIndex], spaces[nextIndex]] = [spaces[nextIndex], spaces[currentIndex]];
+    //   holeIndex = currentIndex;
+    //   nextIndex = holeIndex;
+
+      
+    //   let random = int(Math.random() * (4 - 0) + 0)
+    //   while (random == holeIndex) {
+    //     random = int(Math.random() * (4 - 0) + 0);
+    //   }
+    //   currentIndex = random;
+    //   time += bpmMs;
+    //   oneTime == false;
+    // }
+    // if(beat_time >= duration) {
+    //   duration += bpmMs;
+    //   oneTime == true;
+    // }
+    
+    //bgColor = color(14, 164, 109);
+
+  }
+
+  function currentLetter() {
+    fill(255,255,255);
+    textSize(200);
+    textAlign(CENTER, CENTER);
+    text("|"+lettersList[currentIndex],(windowWidth/2)-200/2,windowHeight/2)
+  }
+
+  function nextLetter() {
+    fill(255,255,255);
+    textSize(200);
+    textAlign(CENTER, CENTER);
+    text(lettersList[nextIndex]+"|",(windowWidth/2)+200/2,windowHeight/2)
+  }
+  function sequenceTextDraw() {
+    fill(255,255,255);
+    textSize(windowWidth/20);
+    textAlign(LEFT, CENTER);
+    //textWrap(sequence);
+    text(sequence,0+shift,windowHeight/2)
+  }
+
+
+  function atPress() {
+    //console.log("pressed")
+  }
+
+  function mouseClicked() {
+    if (mouseX > windowWidth/3*2) { //click a destra
+      seqLength+=2
+      sequence = '';
+      generateSequence(seqLength);
+    } else if (mouseX < windowWidth/3) {
+      seqLength -= 2;
+      sequence = '';
+      generateSequence(seqLength);
+    } else {
+      sequence = '';
+      generateSequence(seqLength);
+    }
+    
+  }
+
+  function bg() {
+    noStroke();
+    fill(14, 164, 109);
+    rect(0,0,windowWidth, windowHeight);
+  }
+
+  function generateSequence(length) {
+    var spacesG = [1,1,1,0];
+    var lettersListG = ['A','B','C','D'];
+    var holeIndexG = 3;
+    let randomG = 0;
+    for (var i = 0;i<=length;i++) {
+      randomG = int(Math.random() * 4);
+      while (int(randomG) == int(holeIndexG)) {
+        randomG = int(Math.random() * 4);
+        console.log("New randomG: " +randomG);
+      }
+      console.log("random: " +randomG + " ,hole: "+holeIndexG);
+      spacesG[randomG] = 'x';
+      //es [1,x,1,0];
+      console.log(spacesG);
+      let randomSpace = int(Math.random() * 10);
+      if (randomSpace <= 1) {
+        sequence = sequence + "|" + lettersListG[randomG] + "--" + lettersListG[holeIndexG] + "|";
+      } else if (randomSpace <= 3) {
+        sequence = sequence + "|" + lettersListG[randomG] + "-" + lettersListG[holeIndexG] + "|";
+      }else{
+        sequence = sequence + "|" + lettersListG[randomG] + "" + lettersListG[holeIndexG] + "|";
+      
+      }
+      //ora riassetto la situa:
+      //1.scambio di posizione la x e lo 0
+      [spacesG[randomG], spacesG[holeIndexG]] = [spacesG[holeIndexG], spacesG[randomG]];
+      //es [1,0,1,x];
+      //aggiorno holeIndex
+      spacesG[holeIndexG] = 1;
+      holeIndexG = randomG;
+      console.log(spacesG);
+
+    }
+    console.log(str(sequence));
+  }
+
+
+
+
+  //JQUERY
+  
+  $(document).bind("contextmenu", function (e) {  //disable right click menu
+    return false;
+  });
+
+
+
+</script>
+
+</html>

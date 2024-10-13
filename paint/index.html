@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="">
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Caterpillar Notation Maker</title>
+  <link rel="preconnect" href="https://fonts.gstatic.com">
+  <link href="https://fonts.googleapis.com/css2?family=BenchNine:wght@300&display=swap" rel="stylesheet">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.16.0/umd/popper.min.js"></script>
+  <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.4.1/css/bootstrap.min.css"
+        integrity="sha384-Vkoo8x4CGsO3+Hhxv8T/Q5PaXtkKtu6ug5TOeNV6gBiFeWPGFN9MuhOf23Q9Ifjh" crossorigin="anonymous" />
+  <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+  <style>
+    a:link {
+      color: #d9534f;
+      text-decoration: none;
+      font-family: "BenchNine";
+    }
+
+    a {
+      font-size: 22px;
+      color: #d9534f;
+      text-decoration: none;
+      font-family: "BenchNine";
+    }
+
+    h1{
+      font-family: 'BenchNine', sans-serif;
+    }
+
+    p{
+      font-size: 22px;
+      font-family: 'BenchNine', sans-serif;
+      padding-top: 10px;
+    }
+
+    #add-page {
+  position: absolute;
+  top: 50%;
+}
+
+.modal {
+  transition: opacity 0.25s ease;
+}
+
+.tb  {
+  border-collapse: collapse;
+  /* width: 100%; */
+  border: 1px solid black;
+  border-left: 1px solid black;
+  text-align: center;
+}
+table.blueTable {
+  font-family: Verdana, Geneva, sans-serif;
+  /* border: 2px solid #1C6EA4; */
+  width: 200px;
+  text-align: left;
+  border-collapse: collapse;
+}
+table.blueTable td, table.blueTable th {
+  text-align: center;
+  font-size: 30px;
+    font-family: Arial;
+  /* border-left: 2px solid #AAAAAA; */
+  /* border-right: 2px solid #AAAAAA; */
+  /* border-top: 2px solid black; */
+  /* border-bottom: 2px solid black; */
+  padding: 3px 2px;
+}
+table.blueTable tbody td {
+  font-size: 14px;
+}
+table.blueTable tfoot td {
+  font-size: 14px;
+}
+table.blueTable tfoot .links {
+  text-align: right;
+}
+table.blueTable tfoot .links a{
+  display: inline-block;
+  background: #1C6EA4;
+  color: #FFFFFF;
+  padding: 2px 8px;
+  border-radius: 5px;
+}
+
+table.blueTable #ciao {
+  border-left: 2px solid #c21f1f;
+}
+table.blueTable #space {
+  
+}
+table.blueTable #left {
+  border-left: 2px solid black;
+  border-top: 2px solid black;
+  border-bottom: 2px solid black;
+}
+table.blueTable #center {
+  border-top: 2px solid black;
+  border-bottom: 2px solid black;
+}
+table.blueTable #right {
+  border-right: 2px solid black;
+  border-top: 2px solid black;
+  border-bottom: 2px solid black;
+}
+</style>
+</head>
+
+<body>
+  <div class="container">
+  <div class="row">
+    <div class="col-lg-12">
+      <p></p>
+    </div>
+  </div>
+  <div class="row">
+    <div class="col-lg-12">
+      <button class="btn btn-light btn-outline-info .btn-lg" id="show-hide-info">Info</button>
+      <!-- <button class="btn btn-light btn-outline-info .btn-lg" id="download-sequence">Download</button> -->
+    </div>
+  </div>
+  <div class="row" id="infoDiv">
+    <div class="col-lg-12">
+        <ul>
+            <li>Type in the box below to add a row</li>
+            <li>ex.  L:/A B/CD/</li>
+            <li>Every time you press "+" a new row is added</li>
+            <li>You can't remove a row FOR NOW</li>
+            <li>You cant change any value FOR NOW</li>
+
+          </ul>
+    </div>
+  </div>
+
+
+  <!-- tabella -->
+  <div class="row">
+    <table class="blueTable">
+      <tbody id="tableBody">
+      <!-- <tr>
+      <td id="left">A</td>
+      <td>C</td>
+      <td>D</td>
+      <td>B</td>
+      </tr>
+      <tr>
+      <td>B</td>
+      <td></td>
+      <td>C</td>
+      <td>A</td>
+      </tr> -->
+      </tbody>
+      </table>
+  </div>
+
+  <!-- aggiungere partition -->
+    <div class="row fixed-bottom">
+        <div class="col-6 bg-light">
+            <input type="text" name="sequence_box" id="sequence_box" placeholder="Add a new sequence">
+        </div>
+        <div class="col-6 bg-light">
+            <button class="btn btn-danger" id="add-sequence">+</button>
+        </div>
+    </div>
+
+
+<div class="row text-center">
+  <div class="col-12">
+  <p> The Caterpillar Notation Maker was fully developed by <a href="http://shawnpinciara.tumblr.com/">Shawn Pinciara</a></p>
+  </div>
+</div>
+
+</div> 
+</body>
+<script>
+    showInfo = false;
+
+  function updateDialog() {
+    alert("Changelog: \n  -Added support for hands letter");
+  }
+
+  $(function () {
+    console.log("dom ready!");
+    $("#infoDiv").hide();
+    
+    // if (localStorage.getItem("HTNMakerversion") != version) {
+    //   localStorage.setItem("HTNMakerversion", version);
+    //   updateDialog();   
+    // }
+  });
+
+ 
+  //JQUERY
+  $("#add-sequence").click(function(){
+        sequenceRawText = $("#sequence_box").val();
+        if (sequenceRawText != '') {
+            console.log("Raw seruence: " + sequenceRawText);
+            //parse text
+            try {
+                showIntroScreen = false;
+                space = sequenceRawText.split(":")[0];
+                subSq = sequenceRawText.split(":")[1];
+                subSqList = subSq.split("/").filter(e =>  e);
+                console.log(subSqList);
+                $("#tableBody").append('<tr>') //open table
+                $("#tableBody").append('<td id="space">'+space+':</td>') //add row
+                
+
+                for (var i = 0; i<subSqList.length;i++) { //per ogni gruggo di lettere
+                  console.log(subSqList[i]);
+                    for (var j = 0; j<subSqList[i].length;j++) { //per ogni lettera
+                      if(j==0) { //prima lettera
+                        $("#tableBody").append('<td id="left">'+subSqList[i][j]+'</td>') //add row
+                        console.log(subSqList[i][j]);
+                      } else if (j==subSqList[i].length-1) { //ultima lettera
+                        $("#tableBody").append('<td id="right">'+subSqList[i][j]+'</td>') //add row
+                        console.log(subSqList[i][j]);
+                      } else { //lettera di mezzo
+                        $("#tableBody").append('<td id="center">'+subSqList[i][j]+'</td>') //add row
+                        console.log(subSqList[i][j]);
+                      }
+                    
+                    
+                    }
+                    //aggiungere rettangolo a seconda di LENGTH della scritta
+                    //aggiungere le varie lettere
+                }
+
+                $("#tableBody").append('</tr>') //close table
+                //addSequence(sequenceRawText);
+            
+            } catch(e) {
+                showIntroScreen = true;
+                alert("The sequence was not written correctly")
+            }
+            
+        } else {
+            alert("You can't add an empty sequence!");
+        }
+         
+    })
+
+    $("#show-hide-info").click(function() {
+        if (showInfo) {
+            $("#infoDiv").hide();
+            showInfo = false;
+        } else {
+            $("#infoDiv").show();
+            showInfo = true;
+        }
+    })
+
+    $("#download-sequence").click(function() {
+        alert("left")
+    })
+
+  $(document).bind("contextmenu", function (e) {  //disable right click menu
+    return false;
+  });
+
+
+  //FUNCTIONS:
+
+
+</script>
+
+</html>
