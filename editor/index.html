@@ -107,8 +107,8 @@
       cursor: pointer; padding: 1px;
     }
 
-    /* SVG Download button */
-    #btn-svg {
+    /* SVG / PNG Download buttons */
+    #btn-svg, #btn-png {
       background: #1a73e8;
       color: #fff;
       border: none;
@@ -124,7 +124,7 @@
       transition: background .15s;
       flex-shrink: 0;
     }
-    #btn-svg:hover { background: #1558b0; }
+    #btn-svg:hover, #btn-png:hover { background: #1558b0; }
 
     /* ── Formula bar ──────────────────────────────────────── */
     #formula-bar {
@@ -159,13 +159,54 @@
     #formula-in:focus { outline: none; border-color: #4285f4; background: #fff; }
 
     /* ── Spreadsheet area ──────────────────────────────────── */
-    #sheet-wrap { flex: 1; overflow: hidden; position: relative; }
+    #main-area   { flex: 1; display: flex; overflow: hidden; }
+    #sheet-wrap  { flex: 1; overflow: hidden; position: relative; }
     #sheet       { width: 100%; height: 100%; }
+
+    /* ── File library panel ───────────────────────────────── */
+    #file-panel {
+      width: 210px;
+      min-width: 210px;
+      background: #fff;
+      border-left: 1px solid #e0e0e0;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      transition: width .2s ease, min-width .2s ease;
+    }
+    #file-panel.closed { width: 0; min-width: 0; }
+    #file-panel-header {
+      padding: 8px 10px 6px;
+      font-size: 12px;
+      font-weight: 600;
+      color: #555;
+      letter-spacing: .3px;
+      border-bottom: 1px solid #e0e0e0;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+    #file-list {
+      flex: 1;
+      overflow-y: auto;
+      padding: 4px 0;
+    }
+    .file-entry {
+      padding: 7px 12px;
+      font-size: 12px;
+      cursor: pointer;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      color: #333;
+      user-select: none;
+    }
+    .file-entry:hover    { background: #f1f3f4; }
+    .file-entry.active   { background: #e8f0fe; color: #1a73e8; font-weight: 600; }
 
     /* Handsontable tweaks */
     .handsontable .htCore td {
       vertical-align: middle;
-      font-size: 18px;        /* default size */
+      font-size: 16px;        /* default size */
       text-align: center;     /* default alignment */
       white-space: nowrap;
       overflow: visible;
@@ -193,11 +234,8 @@
     .tb-btn.active .bord-ico.a { border-color:        #1a73e8; }
 
     /* ── Grid hide ────────────────────────────────────────── */
-    /* Hides the default cell grid lines; custom borders (rendered
-       as overlay divs by HoT) are unaffected and remain visible. */
-    #sheet-wrap.hide-grid .handsontable .htCore td {
-      border-color: transparent !important;
-    }
+    /* Grid visibility is handled in afterRenderer via inline styles
+       so that custom borders stay visible even when the grid is hidden. */
 
     /* ── Status bar ───────────────────────────────────────── */
     #status-bar {
@@ -253,7 +291,7 @@
   <select class="tb-select" id="sel-size" style="width:54px;" title="Dimensione">
     <option>8</option><option>9</option><option>10</option><option>11</option>
     <option>12</option><option>13</option><option>14</option>
-    <option>16</option><option selected>18</option><option>20</option><option>22</option>
+    <option selected>16</option><option>18</option><option>20</option><option>22</option>
     <option>24</option><option>28</option><option>32</option><option>36</option>
     <option>48</option><option>72</option>
   </select>
@@ -280,13 +318,6 @@
 
   <div class="tb-sep"></div>
 
-  <!-- Alignment -->
-  <button class="tb-btn"        id="btn-al" title="Align left">&#8644; L</button>
-  <button class="tb-btn active" id="btn-ac" title="Center">&#8645; C</button>
-  <button class="tb-btn"        id="btn-ar" title="Align right">&#8646; R</button>
-
-  <div class="tb-sep"></div>
-
   <!-- Clear format -->
   <button class="tb-btn" id="btn-clear-fmt" title="Clear formatting">&#10006; Fmt</button>
 
@@ -303,25 +334,28 @@
 
   <!-- Grid visibility toggle -->
   <button class="tb-btn active" id="btn-grid" title="Show/hide grid">&#9783; Grid</button>
+  <button class="tb-btn" id="btn-grid-minus" title="Decrease cell size" style="font-size:16px; padding:0 9px;">−</button>
+  <button class="tb-btn" id="btn-grid-plus"  title="Increase cell size" style="font-size:16px; padding:0 9px;">+</button>
 
   <!-- Spacer -->
   <div style="flex:1; min-width:8px;"></div>
 
   <!-- Import / Export -->
   <input type="file" id="file-input"
-    accept=".xlsx,.xls,.ods,.csv,.wsheet"
+    accept=".xlsx,.xls,.ods,.csv,.wsheet,.html,.htm"
     style="display:none">
+  <button class="tb-btn" id="btn-library"
+    title="Open/close file library">&#128218; Library</button>
   <button class="tb-btn" id="btn-open"
-    title="Open file (xlsx, ods, csv, .wsheet)">&#128193; Open</button>
+    title="Open file (xlsx, ods, csv, .wsheet, Google Sheets html)">&#128193; Open</button>
   <button class="tb-btn" id="btn-save-ws"
     title="Save full sheet with formatting and borders (.wsheet)">&#8659; Save</button>
 
   <div class="tb-sep"></div>
 
-  <!-- SVG export -->
-  <button id="btn-svg" title="Export selected cells as SVG">
-    &#11015; SVG
-  </button>
+  <!-- SVG / PNG export -->
+  <button id="btn-svg" title="Export selected cells as SVG">&#11015; SVG</button>
+  <button id="btn-png" title="Export selected cells as PNG">&#11015; PNG</button>
 </div>
 
 <!-- ── Formula bar ──────────────────────────────────────────────────────── -->
@@ -331,9 +365,16 @@
   <input type="text" id="formula-in" placeholder="Value...">
 </div>
 
-<!-- ── Spreadsheet ──────────────────────────────────────────────────────── -->
-<div id="sheet-wrap">
-  <div id="sheet"></div>
+<!-- ── Spreadsheet + File panel ─────────────────────────────────────────── -->
+<div id="main-area">
+  <div id="sheet-wrap">
+    <div id="sheet"></div>
+  </div>
+
+  <div id="file-panel" class="closed">
+    <div id="file-panel-header">&#128218; Library</div>
+    <div id="file-list"></div>
+  </div>
 </div>
 
 <!-- ── Status bar ───────────────────────────────────────────────────────── -->
@@ -415,6 +456,15 @@ function showToast(msg, ms = 2800) {
 }
 
 /* ═══════════════════════════════════════════════════════════
+   CELL BORDERS STORE  (declared here so afterRenderer can access it)
+   cellBorders[row][col] = { top, right, bottom, left }
+═══════════════════════════════════════════════════════════ */
+const cellBorders = {};
+
+/* Declared here so afterRenderer can access it during initial render */
+let gridVisible = true;
+
+/* ═══════════════════════════════════════════════════════════
    HANDSONTABLE
 ═══════════════════════════════════════════════════════════ */
 const hot = new Handsontable(document.getElementById('sheet'), {
@@ -477,25 +527,52 @@ const hot = new Handsontable(document.getElementById('sheet'), {
   width:  '100%',
   height: '100%',
   licenseKey: 'non-commercial-and-evaluation',
-  colWidths: 50,
-  rowHeights: 50,
-  customBorders: true,
+  colWidths: 36,
+  rowHeights: 36,
+  customBorders: false,
   wordWrap: false,
 
   afterRenderer(TD, row, col) {
     const fmt = cellFormats[row]?.[col];
-    if (!fmt) return;
-    TD.style.fontWeight = fmt.bold   ? 'bold'   : '';
-    TD.style.fontStyle  = fmt.italic ? 'italic' : '';
-    const dec = [];
-    if (fmt.underline) dec.push('underline');
-    if (fmt.strike)    dec.push('line-through');
-    TD.style.textDecoration  = dec.join(' ') || '';
-    TD.style.color           = fmt.color      || '';
-    TD.style.backgroundColor = (fmt.bgColor && fmt.bgColor !== '#ffffff') ? fmt.bgColor : '';
-    TD.style.fontSize        = fmt.fontSize   ? fmt.fontSize + 'px' : ''; /* '' → CSS default 20px */
-    TD.style.fontFamily      = fmt.fontFamily || '';
-    TD.style.textAlign       = fmt.align      || ''; /* '' → CSS default center */
+    if (fmt) {
+      TD.style.fontWeight = fmt.bold   ? 'bold'   : '';
+      TD.style.fontStyle  = fmt.italic ? 'italic' : '';
+      const dec = [];
+      if (fmt.underline) dec.push('underline');
+      if (fmt.strike)    dec.push('line-through');
+      TD.style.textDecoration  = dec.join(' ') || '';
+      TD.style.color           = fmt.color      || '';
+      TD.style.backgroundColor = (fmt.bgColor && fmt.bgColor !== '#ffffff') ? fmt.bgColor : '';
+      TD.style.fontSize        = fmt.fontSize   ? fmt.fontSize + 'px' : '';
+      TD.style.fontFamily      = fmt.fontFamily || '';
+      TD.style.textAlign       = fmt.align      || '';
+    }
+
+    /* ── Borders (virtual rendering — only visible cells) ──────────────────
+       We must set style+width+color together: color/width alone won't draw
+       a border if borderStyle is still 'none' (HoT only sets right/bottom
+       as default grid lines; top/left have no CSS border at all).       */
+    const b      = cellBorders[row]?.[col] || {};
+    const hidden = !gridVisible;
+    const bSides = ['Top', 'Right', 'Bottom', 'Left'];
+    const bKeys  = ['top', 'right', 'bottom', 'left'];
+    for (let _i = 0; _i < 4; _i++) {
+      const S  = bSides[_i];
+      const on = b[bKeys[_i]];
+      if (on) {
+        TD.style['border' + S + 'Style'] = 'solid';
+        TD.style['border' + S + 'Width'] = '1.5px';
+        TD.style['border' + S + 'Color'] = '#000000';
+      } else if (hidden) {
+        TD.style['border' + S + 'Style'] = 'solid';
+        TD.style['border' + S + 'Width'] = '1px';
+        TD.style['border' + S + 'Color'] = 'transparent';
+      } else {
+        TD.style['border' + S + 'Style'] = '';
+        TD.style['border' + S + 'Width'] = '';
+        TD.style['border' + S + 'Color'] = '';
+      }
+    }
   },
 
   afterSelection(r, c) {
@@ -543,20 +620,16 @@ fxEl.addEventListener('blur', () => {
    TOOLBAR STATE SYNC
 ═══════════════════════════════════════════════════════════ */
 function syncToolbar(row, col) {
-  const fmt   = cellFormats[row]?.[col] || {};
-  const align = fmt.align || 'center'; /* CSS default is center */
+  const fmt = cellFormats[row]?.[col] || {};
 
   document.getElementById('btn-bold').classList.toggle('active',      !!fmt.bold);
   document.getElementById('btn-italic').classList.toggle('active',    !!fmt.italic);
   document.getElementById('btn-underline').classList.toggle('active', !!fmt.underline);
   document.getElementById('btn-strike').classList.toggle('active',    !!fmt.strike);
-  document.getElementById('btn-al').classList.toggle('active', align === 'left');
-  document.getElementById('btn-ac').classList.toggle('active', align === 'center');
-  document.getElementById('btn-ar').classList.toggle('active', align === 'right');
 
   document.getElementById('inp-color').value = fmt.color      || '#000000';
   document.getElementById('inp-bg').value    = fmt.bgColor    || '#ffffff';
-  document.getElementById('sel-size').value  = fmt.fontSize   || 18; /* CSS default is 18 */
+  document.getElementById('sel-size').value  = fmt.fontSize   || 16; /* CSS default is 16 */
   document.getElementById('sel-font').value  = fmt.fontFamily || 'Arial';
 
   /* Border buttons reflect anchor cell's current state */
@@ -602,22 +675,14 @@ document.getElementById('sel-size').onchange = (e) => applyFmt({ fontSize: parse
 document.getElementById('inp-color').oninput  = (e) => applyFmt({ color: e.target.value });
 document.getElementById('inp-bg').oninput     = (e) => applyFmt({ bgColor: e.target.value });
 
-document.getElementById('btn-al').onclick = () => applyFmt({ align: 'left' });
-document.getElementById('btn-ac').onclick = () => applyFmt({ align: 'center' });
-document.getElementById('btn-ar').onclick = () => applyFmt({ align: 'right' });
-
 document.getElementById('btn-clear-fmt').onclick = () => {
   const sel = hot.getSelected();
   if (!sel) return;
-  const plugin = hot.getPlugin('customBorders');
   for (const [r1, c1, r2, c2] of sel) {
     for (let r = Math.min(r1, r2); r <= Math.max(r1, r2); r++) {
       for (let c = Math.min(c1, c2); c <= Math.max(c1, c2); c++) {
         if (cellFormats[r]) delete cellFormats[r][c];
-        if (cellBorders[r]) {
-          delete cellBorders[r][c];
-          plugin.clearBorders([[r, c, r, c]]);
-        }
+        if (cellBorders[r]) delete cellBorders[r][c];
       }
     }
   }
@@ -747,7 +812,7 @@ document.addEventListener('keydown', async (e) => {
 });
 
 /* ═══════════════════════════════════════════════════════════
-   SVG EXPORT
+   SVG / PNG EXPORT
 ═══════════════════════════════════════════════════════════ */
 
 /* Get actual rendered column width */
@@ -763,23 +828,10 @@ function getRowH(row) {
   return 50;
 }
 
-document.getElementById('btn-svg').onclick = () => {
-  const sel = hot.getSelected();
-  if (!sel || !sel.length) {
-    showToast('Select cells first!');
-    return;
-  }
-
-  /* Bounding box over all selection rectangles */
-  let rMin = Infinity, rMax = -Infinity;
-  let cMin = Infinity, cMax = -Infinity;
-  for (const [r1, c1, r2, c2] of sel) {
-    rMin = Math.min(rMin, r1, r2); rMax = Math.max(rMax, r1, r2);
-    cMin = Math.min(cMin, c1, c2); cMax = Math.max(cMax, c1, c2);
-  }
-
+/* Build SVG markup for the given cell range. Returns { svg, totalW, totalH }. */
+function buildSvg(rMin, rMax, cMin, cMax) {
   const PAD     = 5;
-  const CBORD_W = 2;
+  const CBORD_W = 1.5;
   const CBORD_C = '#000000';
 
   const colWidths  = Array.from({ length: cMax - cMin + 1 }, (_, i) => getColW(cMin + i));
@@ -787,9 +839,9 @@ document.getElementById('btn-svg').onclick = () => {
   const totalW = colWidths.reduce((a, b) => a + b, 0);
   const totalH = rowHeights.reduce((a, b) => a + b, 0);
 
-  let defs  = '<defs>';
-  let cells = '';
-  let yOff  = 0;
+  let defs = '<defs>';
+  let body = '';
+  let yOff = 0;
 
   for (let r = rMin; r <= rMax; r++) {
     const rh = rowHeights[r - rMin];
@@ -799,7 +851,6 @@ document.getElementById('btn-svg').onclick = () => {
       const cw  = colWidths[c - cMin];
       const uid = `cp_${r}_${c}`;
 
-      /* Clip path — text won't overflow the cell */
       defs +=
         `<clipPath id="${uid}">` +
         `<rect x="${xOff + PAD}" y="${yOff + 1}" ` +
@@ -808,7 +859,7 @@ document.getElementById('btn-svg').onclick = () => {
 
       const fmt = cellFormats[r]?.[c] || {};
       const fg  = fmt.color      || '#222222';
-      const fs  = fmt.fontSize   || 18;   /* CSS default */
+      const fs  = fmt.fontSize   || 16;
       const ff  = fmt.fontFamily || 'Arial';
       const fw  = fmt.bold       ? 'bold'   : 'normal';
       const fi  = fmt.italic     ? 'italic' : 'normal';
@@ -816,40 +867,30 @@ document.getElementById('btn-svg').onclick = () => {
       if (fmt.underline) decParts.push('underline');
       if (fmt.strike)    decParts.push('line-through');
       const deco = decParts.join(' ') || 'none';
-      const al   = fmt.align || 'center'; /* CSS default */
 
-      /* Cell background — only when a custom fill color is set;
-         no grid squares exported, only text and custom borders. */
       if (fmt.bgColor && fmt.bgColor !== '#ffffff') {
-        cells +=
+        body +=
           `<rect x="${xOff}" y="${yOff}" width="${cw}" height="${rh}" ` +
           `fill="${fmt.bgColor}"/>`;
       }
 
-      /* Cell value */
       const val = hot.getDataAtCell(r, c);
       if (val !== null && val !== undefined && val !== '') {
-        let tx, anchor;
-        if (al === 'center') { tx = xOff + cw / 2;        anchor = 'middle'; }
-        else if (al === 'right')  { tx = xOff + cw - PAD; anchor = 'end';    }
-        else                      { tx = xOff + PAD;       anchor = 'start';  }
-
-        cells +=
-          `<text x="${tx}" y="${yOff + rh / 2}" ` +
+        body +=
+          `<text x="${xOff + cw / 2}" y="${yOff + rh / 2}" ` +
           `font-family="${escapeXml(ff)}, sans-serif" ` +
           `font-size="${fs}" font-weight="${fw}" font-style="${fi}" ` +
           `text-decoration="${deco}" fill="${fg}" ` +
-          `text-anchor="${anchor}" dominant-baseline="middle" ` +
+          `text-anchor="middle" dominant-baseline="middle" ` +
           `clip-path="url(#${uid})">${escapeXml(String(val))}</text>`;
       }
 
-      /* Custom cell borders (drawn on top of background, under nothing) */
-      const b = cellBorders[r]?.[c] || {};
+      const b  = cellBorders[r]?.[c] || {};
       const bl = `stroke="${CBORD_C}" stroke-width="${CBORD_W}" stroke-linecap="square"`;
-      if (b.top)    cells += `<line x1="${xOff}"    y1="${yOff}"    x2="${xOff+cw}" y2="${yOff}"    ${bl}/>`;
-      if (b.bottom) cells += `<line x1="${xOff}"    y1="${yOff+rh}" x2="${xOff+cw}" y2="${yOff+rh}" ${bl}/>`;
-      if (b.left)   cells += `<line x1="${xOff}"    y1="${yOff}"    x2="${xOff}"    y2="${yOff+rh}" ${bl}/>`;
-      if (b.right)  cells += `<line x1="${xOff+cw}" y1="${yOff}"    x2="${xOff+cw}" y2="${yOff+rh}" ${bl}/>`;
+      if (b.top)    body += `<line x1="${xOff}"    y1="${yOff}"    x2="${xOff+cw}" y2="${yOff}"    ${bl}/>`;
+      if (b.bottom) body += `<line x1="${xOff}"    y1="${yOff+rh}" x2="${xOff+cw}" y2="${yOff+rh}" ${bl}/>`;
+      if (b.left)   body += `<line x1="${xOff}"    y1="${yOff}"    x2="${xOff}"    y2="${yOff+rh}" ${bl}/>`;
+      if (b.right)  body += `<line x1="${xOff+cw}" y1="${yOff}"    x2="${xOff+cw}" y2="${yOff+rh}" ${bl}/>`;
 
       xOff += cw;
     }
@@ -857,36 +898,75 @@ document.getElementById('btn-svg').onclick = () => {
   }
 
   defs += '</defs>';
-
   const svg =
     `<?xml version="1.0" encoding="UTF-8"?>\n` +
     `<svg xmlns="http://www.w3.org/2000/svg" ` +
     `width="${totalW}" height="${totalH}" ` +
     `viewBox="0 0 ${totalW} ${totalH}">\n` +
-    `  ${defs}\n  ${cells}\n</svg>`;
+    `  ${defs}\n  ${body}\n</svg>`;
+
+  return { svg, totalW, totalH };
+}
+
+/* ── Selection bounding box helper ── */
+function selectionBounds() {
+  const sel = hot.getSelected();
+  if (!sel || !sel.length) return null;
+  let rMin = Infinity, rMax = -Infinity, cMin = Infinity, cMax = -Infinity;
+  for (const [r1, c1, r2, c2] of sel) {
+    rMin = Math.min(rMin, r1, r2); rMax = Math.max(rMax, r1, r2);
+    cMin = Math.min(cMin, c1, c2); cMax = Math.max(cMax, c1, c2);
+  }
+  return { rMin, rMax, cMin, cMax };
+}
+
+document.getElementById('btn-svg').onclick = () => {
+  const bounds = selectionBounds();
+  if (!bounds) { showToast('Select cells first!'); return; }
+  const { rMin, rMax, cMin, cMax } = bounds;
+  const { svg, totalW, totalH } = buildSvg(rMin, rMax, cMin, cMax);
+  const blob = new Blob([svg], { type: 'image/svg+xml;charset=utf-8' });
+  const url  = URL.createObjectURL(blob);
+  const a    = Object.assign(document.createElement('a'), { href: url, download: `sheet-${Date.now()}.svg` });
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+  showToast(`SVG exported — ${totalW}×${totalH}px`);
+};
+
+document.getElementById('btn-png').onclick = () => {
+  const bounds = selectionBounds();
+  if (!bounds) { showToast('Select cells first!'); return; }
+  const { rMin, rMax, cMin, cMax } = bounds;
+  const { svg, totalW, totalH } = buildSvg(rMin, rMax, cMin, cMax);
+
+  const scale  = 2; /* 2× for crisp retina output */
+  const canvas = Object.assign(document.createElement('canvas'), {
+    width:  totalW * scale,
+    height: totalH * scale,
+  });
+  const ctx = canvas.getContext('2d');
+  ctx.scale(scale, scale);
 
   const blob = new Blob([svg], { type: 'image/svg+xml;charset=utf-8' });
   const url  = URL.createObjectURL(blob);
-  const a    = Object.assign(document.createElement('a'), {
-    href: url,
-    download: `websheet-${Date.now()}.svg`
-  });
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
-
-  showToast(`SVG exported — ${(rMax - rMin + 1) * (cMax - cMin + 1)} cells (${totalW}×${totalH}px).`);
+  const img  = new Image();
+  img.onload = () => {
+    ctx.drawImage(img, 0, 0);
+    URL.revokeObjectURL(url);
+    const pngUrl = canvas.toDataURL('image/png');
+    const a = Object.assign(document.createElement('a'), { href: pngUrl, download: `sheet-${Date.now()}.png` });
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    showToast(`PNG exported — ${totalW}×${totalH}px (${scale}×)`);
+  };
+  img.onerror = () => { URL.revokeObjectURL(url); showToast('PNG export failed.'); };
+  img.src = url;
 };
 
 /* ═══════════════════════════════════════════════════════════
    CUSTOM BORDERS
-   Uses Handsontable's built-in customBorders plugin.
    State is tracked in cellBorders[row][col] = { top, right, bottom, left }
+   (cellBorders is declared above, before Handsontable initialization)
 ═══════════════════════════════════════════════════════════ */
-const cellBorders   = {};
-const BORDER_ON     = { width: 1, color: '#000000' };
-const BORDER_OFF    = false;   // passing false removes that side in HoT
 
 function getBordFmt(row, col) {
   if (!cellBorders[row]) cellBorders[row] = {};
@@ -894,40 +974,24 @@ function getBordFmt(row, col) {
   return cellBorders[row][col];
 }
 
-function applyBorderToCell(row, col) {
-  const plugin = hot.getPlugin('customBorders');
-  const b      = cellBorders[row]?.[col] || {};
-  const hasAny = b.top || b.right || b.bottom || b.left;
-
-  if (!hasAny) {
-    plugin.clearBorders([[row, col, row, col]]);
-    return;
-  }
-  plugin.setBorders([[row, col, row, col]], {
-    top:    b.top    ? BORDER_ON : BORDER_OFF,
-    right:  b.right  ? BORDER_ON : BORDER_OFF,
-    bottom: b.bottom ? BORDER_ON : BORDER_OFF,
-    left:   b.left   ? BORDER_ON : BORDER_OFF,
-  });
-}
+/* applyBorderToCell: kept for paste compatibility — borders live in
+   cellBorders store and are rendered by afterRenderer (virtual). */
+function applyBorderToCell(/* row, col — no-op, hot.render() called by caller */) {}
 
 function toggleBorder(side) {
   const sel = hot.getSelected();
   if (!sel || !sel.length) return;
 
-  /* Enable or disable based on the anchor cell (first in first area) */
   const enable = !getBordFmt(sel[0][0], sel[0][1])[side];
 
   for (const [r1, c1, r2, c2] of sel) {
     const rMin = Math.min(r1, r2), rMax = Math.max(r1, r2);
     const cMin = Math.min(c1, c2), cMax = Math.max(c1, c2);
-    for (let r = rMin; r <= rMax; r++) {
-      for (let c = cMin; c <= cMax; c++) {
+    for (let r = rMin; r <= rMax; r++)
+      for (let c = cMin; c <= cMax; c++)
         getBordFmt(r, c)[side] = enable;
-        applyBorderToCell(r, c);
-      }
-    }
   }
+  hot.render();
   syncToolbar(sel[0][0], sel[0][1]);
 }
 
@@ -958,20 +1022,30 @@ document.getElementById('btn-bord-a').onclick = () => {
       if (r === rMax) b.bottom = true;
       if (c === cMin) b.left   = true;
       if (c === cMax) b.right  = true;
-      applyBorderToCell(r, c);
     }
   }
+  hot.render();
   syncToolbar(sel[0][0], sel[0][1]);
 };
 
 /* ═══════════════════════════════════════════════════════════
-   GRID TOGGLE
+   GRID TOGGLE + SIZE
+   (gridVisible is declared above, before Handsontable initialization)
 ═══════════════════════════════════════════════════════════ */
-let gridVisible = true;
 document.getElementById('btn-grid').onclick = () => {
   gridVisible = !gridVisible;
-  document.getElementById('sheet-wrap').classList.toggle('hide-grid', !gridVisible);
   document.getElementById('btn-grid').classList.toggle('active', gridVisible);
+  hot.render();
+};
+
+let cellSize = 36;
+document.getElementById('btn-grid-minus').onclick = () => {
+  cellSize = Math.max(16, cellSize - 6);
+  hot.updateSettings({ colWidths: cellSize, rowHeights: cellSize });
+};
+document.getElementById('btn-grid-plus').onclick = () => {
+  cellSize = Math.min(150, cellSize + 6);
+  hot.updateSettings({ colWidths: cellSize, rowHeights: cellSize });
 };
 
 /* Resize */
@@ -1008,41 +1082,180 @@ function exportWSheet() {
 }
 
 /* ── .wsheet loader (shared by file import and auto-load) ── */
-function loadWSheetText(text, name) {
+async function loadWSheetText(text, name) {
   const state = JSON.parse(text);
   if (!state || state.version !== 1) throw new Error('Invalid format');
+
+  document.getElementById('st-msg').textContent = 'Loading…';
+  await new Promise(r => requestAnimationFrame(r)); /* yield — browser paints "Loading…" */
 
   /* Clear current state */
   Object.keys(cellFormats).forEach(k => delete cellFormats[k]);
   Object.keys(cellBorders).forEach(k => delete cellBorders[k]);
-  hot.getPlugin('customBorders').clearBorders();
 
-  /* Load data first */
+  /* Load data */
   hot.loadData(state.data || []);
 
   /* Restore formatting */
   if (state.formats) {
-    Object.entries(state.formats).forEach(([r, cols]) =>
-      Object.entries(cols).forEach(([c, fmt]) => {
+    for (const [r, cols] of Object.entries(state.formats))
+      for (const [c, fmt] of Object.entries(cols)) {
         if (!cellFormats[r]) cellFormats[r] = {};
         cellFormats[r][c] = fmt;
-      })
-    );
+      }
   }
 
-  /* Restore borders */
+  /* Restore borders into store — afterRenderer applies them (virtual, no plugin) */
   if (state.borders) {
-    Object.entries(state.borders).forEach(([r, cols]) =>
-      Object.entries(cols).forEach(([c, bfmt]) => {
+    for (const [r, cols] of Object.entries(state.borders))
+      for (const [c, bfmt] of Object.entries(cols)) {
         if (!cellBorders[r]) cellBorders[r] = {};
         cellBorders[r][c] = bfmt;
-        applyBorderToCell(parseInt(r), parseInt(c));
-      })
-    );
+      }
   }
 
-  hot.render();
+  hot.render(); /* single render — afterRenderer applies formats + borders for visible cells */
+  document.getElementById('st-msg').textContent = '';
   if (name) showToast(`Opened: ${name}`);
+}
+
+/* ═══════════════════════════════════════════════════════════
+   GOOGLE SHEETS HTML IMPORT
+   Parses the CSS classes from the <style> block, then reads
+   the .waffle table cells applying borders + formatting.
+═══════════════════════════════════════════════════════════ */
+function parsePtPx(val) {
+  const pt = val.match(/^([\d.]+)pt$/i);
+  if (pt) return Math.round(parseFloat(pt[1]) * 1.333);
+  const px = val.match(/^([\d.]+)px$/i);
+  if (px) return Math.round(parseFloat(px[1]));
+  return null;
+}
+
+function normColor(val) {
+  val = val.trim();
+  if (val.startsWith('#')) return val.toLowerCase();
+  const m = val.match(/^rgb\((\d+),\s*(\d+),\s*(\d+)\)$/i);
+  if (m) return '#' + [m[1], m[2], m[3]].map(n => parseInt(n).toString(16).padStart(2, '0')).join('');
+  return null;
+}
+
+function parseCssClass(decls) {
+  const result = {};
+  for (const raw of decls.split(';')) {
+    const colon = raw.indexOf(':');
+    if (colon === -1) continue;
+    const key = raw.slice(0, colon).trim().toLowerCase();
+    const val = raw.slice(colon + 1).trim();
+    const vl  = val.toLowerCase();
+
+    if (key === 'font-weight' && vl === 'bold')   { result.bold = true; continue; }
+    if (key === 'font-style'  && vl === 'italic')  { result.italic = true; continue; }
+    if (key === 'color')       { const c = normColor(val); if (c) result.color = c; continue; }
+    if (key === 'background-color') { const c = normColor(val); if (c) result.bgColor = c; continue; }
+    if (key === 'text-align')  { if (['left','center','right'].includes(vl)) result.align = vl; continue; }
+    if (key === 'font-size')   { const s = parsePtPx(val); if (s) result.fontSize = s; continue; }
+    if (key === 'font-family') {
+      const families = val.split(',').map(f => f.replace(/["']/g, '').trim());
+      result.fontFamily = families.find(f => !f.toLowerCase().startsWith('docs-')) || families[0];
+      continue;
+    }
+    /* Borders: value like "1px SOLID #000000" means on; "none" means off */
+    if (key === 'border-top')    { result.borderTop    = !vl.includes('none'); continue; }
+    if (key === 'border-bottom') { result.borderBottom = !vl.includes('none'); continue; }
+    if (key === 'border-left')   { result.borderLeft   = !vl.includes('none'); continue; }
+    if (key === 'border-right')  { result.borderRight  = !vl.includes('none'); continue; }
+  }
+  return result;
+}
+
+function handleGoogleSheetsHtml(file) {
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    try {
+      const doc = new DOMParser().parseFromString(e.target.result, 'text/html');
+
+      /* 1 ── Parse CSS class map */
+      const styleMap = {};
+      for (const styleEl of doc.querySelectorAll('style')) {
+        const re = /\.waffle\s+\.(\w+)\s*\{([^}]*)\}/g;
+        let m;
+        while ((m = re.exec(styleEl.textContent)) !== null) {
+          styleMap[m[1]] = parseCssClass(m[2]);
+        }
+      }
+
+      /* 2 ── Read waffle table */
+      const table = doc.querySelector('table.waffle');
+      if (!table) throw new Error('No Google Sheets table found (table.waffle missing)');
+
+      const aoa        = [];
+      const newFormats = {};
+      const newBorders = {};
+
+      for (const tr of table.querySelectorAll('tbody tr')) {
+        const cells   = tr.querySelectorAll('td');
+        const rowIdx  = aoa.length;
+        const rowData = [];
+
+        cells.forEach((td, colIdx) => {
+          rowData.push(td.textContent.trim());
+
+          const cls = (td.className || '').trim();
+          const s   = styleMap[cls];
+          if (!s) return;
+
+          /* Formatting */
+          const fmt = {};
+          if (s.bold)       fmt.bold       = true;
+          if (s.italic)     fmt.italic     = true;
+          if (s.color     && s.color     !== '#000000') fmt.color     = s.color;
+          if (s.bgColor   && s.bgColor   !== '#ffffff') fmt.bgColor   = s.bgColor;
+          if (s.fontSize)   fmt.fontSize   = s.fontSize;
+          if (s.fontFamily) fmt.fontFamily = s.fontFamily;
+          if (s.align)      fmt.align      = s.align;
+          if (Object.keys(fmt).length) {
+            if (!newFormats[rowIdx]) newFormats[rowIdx] = {};
+            newFormats[rowIdx][colIdx] = fmt;
+          }
+
+          /* Borders */
+          if (s.borderTop || s.borderBottom || s.borderLeft || s.borderRight) {
+            if (!newBorders[rowIdx]) newBorders[rowIdx] = {};
+            newBorders[rowIdx][colIdx] = {
+              top:    !!s.borderTop,
+              bottom: !!s.borderBottom,
+              left:   !!s.borderLeft,
+              right:  !!s.borderRight,
+            };
+          }
+        });
+
+        aoa.push(rowData);
+      }
+
+      /* 3 ── Load into Handsontable */
+      Object.keys(cellFormats).forEach(k => delete cellFormats[k]);
+      Object.keys(cellBorders).forEach(k => delete cellBorders[k]);
+      hot.loadData(aoa);
+
+      for (const [r, cols] of Object.entries(newFormats)) {
+        if (!cellFormats[r]) cellFormats[r] = {};
+        Object.assign(cellFormats[r], cols);
+      }
+      for (const [r, cols] of Object.entries(newBorders)) {
+        if (!cellBorders[r]) cellBorders[r] = {};
+        for (const [c, bfmt] of Object.entries(cols)) cellBorders[r][c] = bfmt;
+      }
+
+      hot.render(); /* single render */
+      const borderTotal = Object.values(newBorders).reduce((n, cols) => n + Object.keys(cols).length, 0);
+      showToast(`Opened: ${file.name} (${aoa.length} rows, ${borderTotal} bordered cells)`);
+    } catch (err) {
+      showToast(`Error: ${err.message}`);
+    }
+  };
+  reader.readAsText(file, 'utf-8');
 }
 
 /* ── Import: detect format and load ── */
@@ -1050,30 +1263,57 @@ function handleFileImport(file) {
   if (!file) return;
   const name = file.name.toLowerCase();
 
+  if (name.endsWith('.html') || name.endsWith('.htm')) {
+    handleGoogleSheetsHtml(file);
+    return;
+  }
+
   if (name.endsWith('.wsheet')) {
     const reader = new FileReader();
-    reader.onload = (e) => {
-      try { loadWSheetText(e.target.result, file.name); }
+    reader.onload = async (e) => {
+      try { await loadWSheetText(e.target.result, file.name); }
       catch (err) { showToast(`Error: ${err.message}`); }
     };
     reader.readAsText(file);
 
   } else {
-    /* ── xlsx / ods / csv / xls: SheetJS (data only) ── */
+    /* ── xlsx / ods / csv / xls: SheetJS ── */
     const reader = new FileReader();
     reader.onload = (e) => {
       try {
         const data = new Uint8Array(e.target.result);
-        const wb   = XLSX.read(data, { type: 'array' });
+        const wb   = XLSX.read(data, { type: 'array', cellStyles: true });
         const ws   = wb.Sheets[wb.SheetNames[0]];
         const aoa  = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
 
-        /* Clear formatting and borders — file carries none */
+        /* Clear formatting and borders */
         Object.keys(cellFormats).forEach(k => delete cellFormats[k]);
         Object.keys(cellBorders).forEach(k => delete cellBorders[k]);
-        hot.getPlugin('customBorders').clearBorders();
 
         hot.loadData(aoa);
+
+        /* Extract borders from xlsx cell styles into store */
+        const ref = ws['!ref'];
+        if (ref) {
+          const range = XLSX.utils.decode_range(ref);
+          for (let r = range.s.r; r <= range.e.r; r++) {
+            for (let c = range.s.c; c <= range.e.c; c++) {
+              const cell = ws[XLSX.utils.encode_cell({ r, c })];
+              if (!cell?.s?.border) continue;
+              const b = cell.s.border;
+              if (!b.top?.style && !b.bottom?.style && !b.left?.style && !b.right?.style) continue;
+              if (!cellBorders[r]) cellBorders[r] = {};
+              cellBorders[r][c] = {
+                top:    !!b.top?.style,
+                bottom: !!b.bottom?.style,
+                left:   !!b.left?.style,
+                right:  !!b.right?.style,
+              };
+            }
+          }
+        }
+
+        hot.render(); /* single render */
         showToast(`Opened: ${file.name} (${wb.SheetNames[0]})`);
       } catch (err) {
         showToast(`Error reading file: ${err.message}`);
@@ -1093,10 +1333,58 @@ fileInput.addEventListener('change', (e) => {
 document.getElementById('btn-open').onclick    = () => fileInput.click();
 document.getElementById('btn-save-ws').onclick = exportWSheet;
 
+/* ═══════════════════════════════════════════════════════════
+   FILE LIBRARY PANEL
+═══════════════════════════════════════════════════════════ */
+let libraryOpen   = false;
+let activeEntry   = null;
+
+const filePanel   = document.getElementById('file-panel');
+const fileListEl  = document.getElementById('file-list');
+const btnLibrary  = document.getElementById('btn-library');
+
+function toggleLibrary() {
+  libraryOpen = !libraryOpen;
+  filePanel.classList.toggle('closed', !libraryOpen);
+  btnLibrary.classList.toggle('active', libraryOpen);
+  if (libraryOpen) hot.refreshDimensions();
+}
+
+function loadLibraryFile(filename, entryEl) {
+  fetch(`./data/${encodeURIComponent(filename)}`)
+    .then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.text(); })
+    .then(async text => {
+      await loadWSheetText(text, filename);
+      if (activeEntry) activeEntry.classList.remove('active');
+      activeEntry = entryEl;
+      entryEl.classList.add('active');
+    })
+    .catch(err => showToast(`Error loading ${filename}: ${err.message}`));
+}
+
+fetch('./data/index.json')
+  .then(r => r.json())
+  .then(files => {
+    fileListEl.innerHTML = '';
+    for (const f of files) {
+      const el = document.createElement('div');
+      el.className = 'file-entry';
+      el.title = f;
+      el.textContent = f.replace(/\.wsheet$/i, '');
+      el.onclick = () => loadLibraryFile(f, el);
+      fileListEl.appendChild(el);
+    }
+  })
+  .catch(() => {
+    fileListEl.innerHTML = '<div style="padding:10px;color:#aaa;font-size:11px;">No files found</div>';
+  });
+
+btnLibrary.onclick = toggleLibrary;
+
 /* ── Auto-load template on startup ── */
 fetch('./data/template.wsheet')
   .then(r => { if (!r.ok) throw new Error(); return r.text(); })
-  .then(text => { try { loadWSheetText(text, null); } catch (_) {} })
+  .then(text => loadWSheetText(text, null).catch(() => {}))
   .catch(() => {}); /* silently skip if file is missing */
 </script>
 </body>
