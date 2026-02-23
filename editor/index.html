@@ -1,0 +1,1103 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>POINTS — Sequences Editor</title>
+
+  <!-- Handsontable Community Edition -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/handsontable@14.6.1/dist/handsontable.full.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/handsontable@14.6.1/dist/handsontable.full.min.js"></script>
+  <!-- SheetJS — reads/writes xlsx, ods, csv and many other formats -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; overflow: hidden; }
+    body {
+      display: flex;
+      flex-direction: column;
+      font-family: 'Segoe UI', Arial, sans-serif;
+      font-size: 13px;
+      background: #f8f9fa;
+      color: #222;
+    }
+
+    /* ── App bar ──────────────────────────────────────────── */
+    #app-bar {
+      background: #6bc3c5;
+      color: #fff;
+      height: 46px;
+      padding: 0 16px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-shrink: 0;
+      box-shadow: 0 2px 4px rgba(0,0,0,.18);
+      z-index: 10;
+    }
+    #app-logo {
+      width: 28px; height: 28px;
+      background: #fff;
+      border-radius: 4px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 17px;
+      flex-shrink: 0;
+    }
+    #app-title { font-size: 17px; font-weight: 600; letter-spacing: .2px; }
+    #app-subtitle { font-size: 12px; opacity: .75; margin-left: 2px; }
+
+    /* ── Toolbar ──────────────────────────────────────────── */
+    #toolbar {
+      background: #fff;
+      border-bottom: 1px solid #e0e0e0;
+      padding: 4px 10px;
+      display: flex;
+      align-items: center;
+      gap: 3px;
+      flex-shrink: 0;
+      flex-wrap: wrap;
+      min-height: 38px;
+    }
+
+    .tb-btn {
+      border: 1px solid transparent;
+      background: transparent;
+      border-radius: 3px;
+      cursor: pointer;
+      padding: 0 7px;
+      height: 26px;
+      min-width: 26px;
+      font-size: 13px;
+      color: #3c3c3c;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+      transition: background .1s, border-color .1s;
+      user-select: none;
+      white-space: nowrap;
+    }
+    .tb-btn:hover  { background: #f1f3f4; border-color: #dadce0; }
+    .tb-btn.active { background: #e8f0fe; border-color: #4285f4; color: #1a73e8; }
+    .tb-btn:focus  { outline: none; }
+
+    .tb-sep { width: 1px; height: 20px; background: #e0e0e0; margin: 0 5px; flex-shrink: 0; }
+
+    .tb-select {
+      border: 1px solid #e0e0e0;
+      border-radius: 3px;
+      background: #fff;
+      height: 26px;
+      padding: 0 4px;
+      font-size: 13px;
+      color: #3c3c3c;
+      cursor: pointer;
+    }
+    .tb-select:focus { outline: none; border-color: #4285f4; }
+
+    .color-wrap {
+      display: flex; flex-direction: column; align-items: center;
+      gap: 1px; cursor: pointer;
+    }
+    .color-label { font-size: 10px; color: #888; line-height: 1; }
+    .color-swatch {
+      width: 26px; height: 20px;
+      border: 1px solid #ccc; border-radius: 2px;
+      cursor: pointer; padding: 1px;
+    }
+
+    /* SVG Download button */
+    #btn-svg {
+      background: #1a73e8;
+      color: #fff;
+      border: none;
+      border-radius: 4px;
+      height: 28px;
+      padding: 0 14px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: background .15s;
+      flex-shrink: 0;
+    }
+    #btn-svg:hover { background: #1558b0; }
+
+    /* ── Formula bar ──────────────────────────────────────── */
+    #formula-bar {
+      background: #fff;
+      border-bottom: 1px solid #e0e0e0;
+      padding: 3px 10px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-shrink: 0;
+      height: 32px;
+    }
+    #cell-addr {
+      width: 58px;
+      padding: 2px 6px;
+      border: 1px solid #ccc;
+      border-radius: 2px;
+      font-size: 12px;
+      text-align: center;
+      background: #fafafa;
+    }
+    #cell-addr:focus { outline: none; border-color: #4285f4; background: #fff; }
+    #fx-label { color: #aaa; font-style: italic; font-size: 15px; flex-shrink: 0; }
+    #formula-in {
+      flex: 1;
+      padding: 2px 6px;
+      border: 1px solid transparent;
+      border-radius: 2px;
+      font-size: 13px;
+      background: transparent;
+    }
+    #formula-in:focus { outline: none; border-color: #4285f4; background: #fff; }
+
+    /* ── Spreadsheet area ──────────────────────────────────── */
+    #sheet-wrap { flex: 1; overflow: hidden; position: relative; }
+    #sheet       { width: 100%; height: 100%; }
+
+    /* Handsontable tweaks */
+    .handsontable .htCore td {
+      vertical-align: middle;
+      font-size: 18px;        /* default size */
+      text-align: center;     /* default alignment */
+      white-space: nowrap;
+      overflow: visible;
+    }
+    .handsontable .htCore th { background: #f1f3f4; color: #555; font-weight: 600; }
+
+    /* ── Border-icon buttons ──────────────────────────────── */
+    /* Small box with one thick side to show which border is set */
+    .bord-ico {
+      width: 13px; height: 13px;
+      border: 1px solid #bbb;
+      display: inline-block;
+      flex-shrink: 0;
+    }
+    .bord-ico.t { border-top:    2.5px solid #333; }
+    .bord-ico.r { border-right:  2.5px solid #333; }
+    .bord-ico.b { border-bottom: 2.5px solid #333; }
+    .bord-ico.l { border-left:   2.5px solid #333; }
+    .bord-ico.a { border:        2.5px solid #333; }
+    /* Active state: highlight the thick side in blue */
+    .tb-btn.active .bord-ico.t { border-top-color:    #1a73e8; }
+    .tb-btn.active .bord-ico.r { border-right-color:  #1a73e8; }
+    .tb-btn.active .bord-ico.b { border-bottom-color: #1a73e8; }
+    .tb-btn.active .bord-ico.l { border-left-color:   #1a73e8; }
+    .tb-btn.active .bord-ico.a { border-color:        #1a73e8; }
+
+    /* ── Grid hide ────────────────────────────────────────── */
+    /* Hides the default cell grid lines; custom borders (rendered
+       as overlay divs by HoT) are unaffected and remain visible. */
+    #sheet-wrap.hide-grid .handsontable .htCore td {
+      border-color: transparent !important;
+    }
+
+    /* ── Status bar ───────────────────────────────────────── */
+    #status-bar {
+      background: #fff;
+      border-top: 1px solid #e0e0e0;
+      padding: 2px 14px;
+      font-size: 11px;
+      color: #777;
+      display: flex;
+      align-items: center;
+      gap: 20px;
+      flex-shrink: 0;
+      height: 24px;
+    }
+    #st-msg { margin-left: auto; color: #1a73e8; font-weight: 500; }
+
+    /* ── Toast notification ───────────────────────────────── */
+    #toast {
+      position: fixed; bottom: 36px; left: 50%; transform: translateX(-50%);
+      background: #323232; color: #fff;
+      padding: 8px 18px; border-radius: 4px;
+      font-size: 13px; pointer-events: none;
+      opacity: 0; transition: opacity .25s;
+      z-index: 9999;
+    }
+    #toast.show { opacity: 1; }
+  </style>
+</head>
+<body>
+
+<!-- ── App bar ──────────────────────────────────────────────────────────── -->
+<div id="app-bar">
+  <div id="app-logo">&#9783;</div>
+  <span id="app-title">POINTS</span>
+  <span id="app-subtitle">Sequences Editor</span>
+</div>
+
+<!-- ── Toolbar ──────────────────────────────────────────────────────────── -->
+<div id="toolbar">
+
+  <!-- Font family -->
+  <select class="tb-select" id="sel-font" style="width:114px;" title="Font">
+    <option value="Arial">Arial</option>
+    <option value="Verdana">Verdana</option>
+    <option value="Georgia">Georgia</option>
+    <option value="Trebuchet MS">Trebuchet MS</option>
+    <option value="Courier New">Courier New</option>
+    <option value="Times New Roman">Times New Roman</option>
+    <option value="Impact">Impact</option>
+  </select>
+
+  <!-- Font size -->
+  <select class="tb-select" id="sel-size" style="width:54px;" title="Dimensione">
+    <option>8</option><option>9</option><option>10</option><option>11</option>
+    <option>12</option><option>13</option><option>14</option>
+    <option>16</option><option selected>18</option><option>20</option><option>22</option>
+    <option>24</option><option>28</option><option>32</option><option>36</option>
+    <option>48</option><option>72</option>
+  </select>
+
+  <div class="tb-sep"></div>
+
+  <!-- Style buttons -->
+  <button class="tb-btn" id="btn-bold"      title="Bold (Ctrl+B)"><b>B</b></button>
+  <button class="tb-btn" id="btn-italic"    title="Italic (Ctrl+I)"><i>I</i></button>
+  <button class="tb-btn" id="btn-underline" title="Underline (Ctrl+U)"><u>U</u></button>
+  <button class="tb-btn" id="btn-strike"    title="Strikethrough"><s>S</s></button>
+
+  <div class="tb-sep"></div>
+
+  <!-- Color pickers -->
+  <div class="color-wrap" title="Text color">
+    <span class="color-label">A</span>
+    <input type="color" class="color-swatch" id="inp-color" value="#000000">
+  </div>
+  <div class="color-wrap" title="Background color" style="margin-left:4px;">
+    <span class="color-label" style="font-size:12px;">&#9608;</span>
+    <input type="color" class="color-swatch" id="inp-bg" value="#ffffff">
+  </div>
+
+  <div class="tb-sep"></div>
+
+  <!-- Alignment -->
+  <button class="tb-btn"        id="btn-al" title="Align left">&#8644; L</button>
+  <button class="tb-btn active" id="btn-ac" title="Center">&#8645; C</button>
+  <button class="tb-btn"        id="btn-ar" title="Align right">&#8646; R</button>
+
+  <div class="tb-sep"></div>
+
+  <!-- Clear format -->
+  <button class="tb-btn" id="btn-clear-fmt" title="Clear formatting">&#10006; Fmt</button>
+
+  <div class="tb-sep"></div>
+
+  <!-- Cell borders -->
+  <button class="tb-btn" id="btn-bord-t" title="Top border">   <span class="bord-ico t"></span></button>
+  <button class="tb-btn" id="btn-bord-l" title="Left border">  <span class="bord-ico l"></span></button>
+  <button class="tb-btn" id="btn-bord-b" title="Bottom border"><span class="bord-ico b"></span></button>
+  <button class="tb-btn" id="btn-bord-r" title="Right border"> <span class="bord-ico r"></span></button>
+  <button class="tb-btn" id="btn-bord-a" title="All borders">  <span class="bord-ico a"></span></button>
+
+  <div class="tb-sep"></div>
+
+  <!-- Grid visibility toggle -->
+  <button class="tb-btn active" id="btn-grid" title="Show/hide grid">&#9783; Grid</button>
+
+  <!-- Spacer -->
+  <div style="flex:1; min-width:8px;"></div>
+
+  <!-- Import / Export -->
+  <input type="file" id="file-input"
+    accept=".xlsx,.xls,.ods,.csv,.wsheet"
+    style="display:none">
+  <button class="tb-btn" id="btn-open"
+    title="Open file (xlsx, ods, csv, .wsheet)">&#128193; Open</button>
+  <button class="tb-btn" id="btn-save-ws"
+    title="Save full sheet with formatting and borders (.wsheet)">&#8659; Save</button>
+
+  <div class="tb-sep"></div>
+
+  <!-- SVG export -->
+  <button id="btn-svg" title="Export selected cells as SVG">
+    &#11015; SVG
+  </button>
+</div>
+
+<!-- ── Formula bar ──────────────────────────────────────────────────────── -->
+<div id="formula-bar">
+  <input type="text" id="cell-addr" value="A1" readonly>
+  <span id="fx-label">ƒx</span>
+  <input type="text" id="formula-in" placeholder="Value...">
+</div>
+
+<!-- ── Spreadsheet ──────────────────────────────────────────────────────── -->
+<div id="sheet-wrap">
+  <div id="sheet"></div>
+</div>
+
+<!-- ── Status bar ───────────────────────────────────────────────────────── -->
+<div id="status-bar">
+  <span id="st-cells">Ready</span>
+  <span id="st-avg"></span>
+  <span id="st-sum"></span>
+  <span id="st-msg"></span>
+</div>
+
+<!-- Toast -->
+<div id="toast"></div>
+
+<script>
+'use strict';
+
+/* ═══════════════════════════════════════════════════════════
+   CELL FORMAT STORE
+   cellFormats[row][col] = { bold, italic, underline, strike,
+     color, bgColor, fontSize, fontFamily, align }
+═══════════════════════════════════════════════════════════ */
+const cellFormats = {};
+
+function getFmt(row, col) {
+  if (!cellFormats[row]) cellFormats[row] = {};
+  if (!cellFormats[row][col]) cellFormats[row][col] = {};
+  return cellFormats[row][col];
+}
+
+function applyFmt(props) {
+  const sel = hot.getSelected();
+  if (!sel) return;
+  for (const [r1, c1, r2, c2] of sel) {
+    const rMin = Math.min(r1, r2), rMax = Math.max(r1, r2);
+    const cMin = Math.min(c1, c2), cMax = Math.max(c1, c2);
+    for (let r = rMin; r <= rMax; r++)
+      for (let c = cMin; c <= cMax; c++)
+        Object.assign(getFmt(r, c), props);
+  }
+  hot.render();
+  const s = hot.getSelected();
+  if (s && s.length) syncToolbar(s[0][0], s[0][1]);
+}
+
+function toggleFmt(key) {
+  const sel = hot.getSelected();
+  if (!sel || !sel.length) return;
+  const [r, c] = sel[0];
+  applyFmt({ [key]: !getFmt(r, c)[key] });
+}
+
+/* ═══════════════════════════════════════════════════════════
+   UTILITIES
+═══════════════════════════════════════════════════════════ */
+function colLetter(col) {
+  let s = ''; col++;
+  while (col > 0) {
+    s = String.fromCharCode(65 + (col - 1) % 26) + s;
+    col = Math.floor((col - 1) / 26);
+  }
+  return s;
+}
+function cellAddr(r, c) { return colLetter(c) + (r + 1); }
+
+function escapeXml(s) {
+  return String(s)
+    .replace(/&/g,  '&amp;')
+    .replace(/</g,  '&lt;')
+    .replace(/>/g,  '&gt;')
+    .replace(/"/g,  '&quot;')
+    .replace(/'/g, '&apos;');
+}
+
+function showToast(msg, ms = 2800) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  setTimeout(() => el.classList.remove('show'), ms);
+}
+
+/* ═══════════════════════════════════════════════════════════
+   HANDSONTABLE
+═══════════════════════════════════════════════════════════ */
+const hot = new Handsontable(document.getElementById('sheet'), {
+  data: Handsontable.helper.createEmptySpreadsheetData(400, 50),
+  rowHeaders: true,
+  colHeaders: true,
+  contextMenu: {
+    items: {
+      copy: {
+        name: 'Copy',
+        callback: () => copyToClipboard(),
+      },
+      cut: {
+        name: 'Cut',
+        callback: () => {
+          copyToClipboard(); /* sets internalClipboard synchronously */
+          const s = hot.getSelected();
+          if (!s) return;
+          const changes = [];
+          for (const [r1, c1, r2, c2] of s) {
+            for (let r = Math.min(r1, r2); r <= Math.max(r1, r2); r++)
+              for (let c = Math.min(c1, c2); c <= Math.max(c1, c2); c++)
+                changes.push([r, c, null]);
+          }
+          hot.setDataAtCell(changes);
+        },
+      },
+      paste: {
+        name: 'Paste',
+        callback: () => pasteFromClipboard(),
+      },
+      row_above:  {},
+      row_below:  {},
+      col_left:   {},
+      col_right:  {},
+      remove_row: {},
+      remove_col: {},
+      add_50_rows: {
+        name: 'Add 50 rows',
+        callback() {
+          const sel = hot.getSelected();
+          const afterRow = sel ? Math.max(...sel.map(([r1,,r2]) => Math.max(r1, r2))) : hot.countRows() - 1;
+          hot.alter('insert_row_below', afterRow, 50);
+        },
+      },
+      add_50_cols: {
+        name: 'Add 50 columns',
+        callback() {
+          const sel = hot.getSelected();
+          const afterCol = sel ? Math.max(...sel.map(([,c1,,c2]) => Math.max(c1, c2))) : hot.countCols() - 1;
+          hot.alter('insert_col_end', afterCol, 50);
+        },
+      },
+    },
+  },
+  manualColumnResize: false,
+  manualRowResize: false,
+  selectionMode: 'multiple',
+  outsideClickDeselects: false,
+  width:  '100%',
+  height: '100%',
+  licenseKey: 'non-commercial-and-evaluation',
+  colWidths: 50,
+  rowHeights: 50,
+  customBorders: true,
+  wordWrap: false,
+
+  afterRenderer(TD, row, col) {
+    const fmt = cellFormats[row]?.[col];
+    if (!fmt) return;
+    TD.style.fontWeight = fmt.bold   ? 'bold'   : '';
+    TD.style.fontStyle  = fmt.italic ? 'italic' : '';
+    const dec = [];
+    if (fmt.underline) dec.push('underline');
+    if (fmt.strike)    dec.push('line-through');
+    TD.style.textDecoration  = dec.join(' ') || '';
+    TD.style.color           = fmt.color      || '';
+    TD.style.backgroundColor = (fmt.bgColor && fmt.bgColor !== '#ffffff') ? fmt.bgColor : '';
+    TD.style.fontSize        = fmt.fontSize   ? fmt.fontSize + 'px' : ''; /* '' → CSS default 20px */
+    TD.style.fontFamily      = fmt.fontFamily || '';
+    TD.style.textAlign       = fmt.align      || ''; /* '' → CSS default center */
+  },
+
+  afterSelection(r, c) {
+    updateFormulaBar(r, c);
+    syncToolbar(r, c);
+    updateStatus();
+  },
+
+  afterChange(changes) {
+    if (!changes) return;
+    const s = hot.getSelected();
+    if (s && s.length) updateFormulaBar(s[0][0], s[0][1]);
+    updateStatus();
+  },
+});
+
+/* ═══════════════════════════════════════════════════════════
+   FORMULA BAR
+═══════════════════════════════════════════════════════════ */
+const addrEl = document.getElementById('cell-addr');
+const fxEl   = document.getElementById('formula-in');
+
+function updateFormulaBar(row, col) {
+  addrEl.value = cellAddr(row, col);
+  const v = hot.getDataAtCell(row, col);
+  fxEl.value = (v == null) ? '' : String(v);
+}
+
+fxEl.addEventListener('keydown', (e) => {
+  if (e.key !== 'Enter' && e.key !== 'Tab') return;
+  e.preventDefault();
+  const s = hot.getSelected();
+  if (!s || !s.length) return;
+  const [r, c] = s[0];
+  hot.setDataAtCell(r, c, fxEl.value);
+  hot.selectCell(r, c);
+});
+fxEl.addEventListener('blur', () => {
+  const s = hot.getSelected();
+  if (!s || !s.length) return;
+  hot.setDataAtCell(s[0][0], s[0][1], fxEl.value);
+});
+
+/* ═══════════════════════════════════════════════════════════
+   TOOLBAR STATE SYNC
+═══════════════════════════════════════════════════════════ */
+function syncToolbar(row, col) {
+  const fmt   = cellFormats[row]?.[col] || {};
+  const align = fmt.align || 'center'; /* CSS default is center */
+
+  document.getElementById('btn-bold').classList.toggle('active',      !!fmt.bold);
+  document.getElementById('btn-italic').classList.toggle('active',    !!fmt.italic);
+  document.getElementById('btn-underline').classList.toggle('active', !!fmt.underline);
+  document.getElementById('btn-strike').classList.toggle('active',    !!fmt.strike);
+  document.getElementById('btn-al').classList.toggle('active', align === 'left');
+  document.getElementById('btn-ac').classList.toggle('active', align === 'center');
+  document.getElementById('btn-ar').classList.toggle('active', align === 'right');
+
+  document.getElementById('inp-color').value = fmt.color      || '#000000';
+  document.getElementById('inp-bg').value    = fmt.bgColor    || '#ffffff';
+  document.getElementById('sel-size').value  = fmt.fontSize   || 18; /* CSS default is 18 */
+  document.getElementById('sel-font').value  = fmt.fontFamily || 'Arial';
+
+  /* Border buttons reflect anchor cell's current state */
+  const bfmt = cellBorders[row]?.[col] || {};
+  document.getElementById('btn-bord-t').classList.toggle('active', !!bfmt.top);
+  document.getElementById('btn-bord-r').classList.toggle('active', !!bfmt.right);
+  document.getElementById('btn-bord-b').classList.toggle('active', !!bfmt.bottom);
+  document.getElementById('btn-bord-l').classList.toggle('active', !!bfmt.left);
+}
+
+/* ═══════════════════════════════════════════════════════════
+   STATUS BAR
+═══════════════════════════════════════════════════════════ */
+function updateStatus() {
+  const sel = hot.getSelected();
+  if (!sel || !sel.length) return;
+  let count = 0, sum = 0, nums = 0;
+  for (const [r1, c1, r2, c2] of sel) {
+    const rMin = Math.min(r1, r2), rMax = Math.max(r1, r2);
+    const cMin = Math.min(c1, c2), cMax = Math.max(c1, c2);
+    count += (rMax - rMin + 1) * (cMax - cMin + 1);
+    for (let r = rMin; r <= rMax; r++)
+      for (let c = cMin; c <= cMax; c++) {
+        const v = parseFloat(hot.getDataAtCell(r, c));
+        if (!isNaN(v)) { sum += v; nums++; }
+      }
+  }
+  document.getElementById('st-cells').textContent = `Cells: ${count}`;
+  document.getElementById('st-sum').textContent   = nums ? `Sum: ${sum}` : '';
+  document.getElementById('st-avg').textContent   = nums ? `Avg: ${(sum / nums).toFixed(2)}` : '';
+}
+
+/* ═══════════════════════════════════════════════════════════
+   TOOLBAR WIRING
+═══════════════════════════════════════════════════════════ */
+document.getElementById('btn-bold').onclick      = () => toggleFmt('bold');
+document.getElementById('btn-italic').onclick    = () => toggleFmt('italic');
+document.getElementById('btn-underline').onclick = () => toggleFmt('underline');
+document.getElementById('btn-strike').onclick    = () => toggleFmt('strike');
+
+document.getElementById('sel-font').onchange = (e) => applyFmt({ fontFamily: e.target.value });
+document.getElementById('sel-size').onchange = (e) => applyFmt({ fontSize: parseInt(e.target.value) });
+document.getElementById('inp-color').oninput  = (e) => applyFmt({ color: e.target.value });
+document.getElementById('inp-bg').oninput     = (e) => applyFmt({ bgColor: e.target.value });
+
+document.getElementById('btn-al').onclick = () => applyFmt({ align: 'left' });
+document.getElementById('btn-ac').onclick = () => applyFmt({ align: 'center' });
+document.getElementById('btn-ar').onclick = () => applyFmt({ align: 'right' });
+
+document.getElementById('btn-clear-fmt').onclick = () => {
+  const sel = hot.getSelected();
+  if (!sel) return;
+  const plugin = hot.getPlugin('customBorders');
+  for (const [r1, c1, r2, c2] of sel) {
+    for (let r = Math.min(r1, r2); r <= Math.max(r1, r2); r++) {
+      for (let c = Math.min(c1, c2); c <= Math.max(c1, c2); c++) {
+        if (cellFormats[r]) delete cellFormats[r][c];
+        if (cellBorders[r]) {
+          delete cellBorders[r][c];
+          plugin.clearBorders([[r, c, r, c]]);
+        }
+      }
+    }
+  }
+  hot.render();
+  const s = hot.getSelected();
+  if (s && s.length) syncToolbar(s[0][0], s[0][1]);
+  showToast('Formatting cleared.');
+};
+
+/* ═══════════════════════════════════════════════════════════
+   CLIPBOARD
+   internalClipboard stores the full cell state (values, formatting,
+   borders) so that a same-session paste restores everything.
+   A plain TSV is also written to the system clipboard for
+   interoperability with external apps (Excel, Sheets, etc.).
+   External pastes (Ctrl+V when the system clipboard differs
+   from our last copy) are treated as TSV-only: only values are
+   pasted and existing destination formatting/borders are kept.
+═══════════════════════════════════════════════════════════ */
+let internalClipboard = null; /* { tsv, grid:[[{v, fmt, bfmt}]] } */
+
+async function copyToClipboard() {
+  const sel = hot.getSelected();
+  if (!sel || !sel.length) return;
+
+  let rMin = Infinity, rMax = -Infinity, cMin = Infinity, cMax = -Infinity;
+  for (const [r1, c1, r2, c2] of sel) {
+    rMin = Math.min(rMin, r1, r2); rMax = Math.max(rMax, r1, r2);
+    cMin = Math.min(cMin, c1, c2); cMax = Math.max(cMax, c1, c2);
+  }
+
+  const tsvRows = [];
+  const grid    = [];
+  for (let r = rMin; r <= rMax; r++) {
+    const rowTsv  = [];
+    const rowData = [];
+    for (let c = cMin; c <= cMax; c++) {
+      const v    = hot.getDataAtCell(r, c);
+      const vStr = (v == null) ? '' : String(v);
+      rowTsv.push(vStr);
+      rowData.push({
+        v,
+        fmt:  cellFormats[r]?.[c]  ? { ...cellFormats[r][c] }  : null,
+        bfmt: cellBorders[r]?.[c]  ? { ...cellBorders[r][c] }  : null,
+      });
+    }
+    tsvRows.push(rowTsv.join('\t'));
+    grid.push(rowData);
+  }
+
+  const tsv = tsvRows.join('\n');
+  internalClipboard = { tsv, grid }; /* set synchronously — used by paste immediately */
+  try { await navigator.clipboard.writeText(tsv); }
+  catch { /* clipboard API unavailable — internal clipboard still works */ }
+}
+
+async function pasteFromClipboard() {
+  const sel = hot.getSelected();
+  if (!sel || !sel.length) return;
+
+  const r0 = Math.min(sel[0][0], sel[0][2]);
+  const c0 = Math.min(sel[0][1], sel[0][3]);
+
+  /* Check if system clipboard matches our last internal copy */
+  let systemText = null;
+  try { systemText = await navigator.clipboard.readText(); } catch { /* ignore */ }
+
+  const useInternal = internalClipboard &&
+    (!systemText || systemText === internalClipboard.tsv);
+
+  if (useInternal) {
+    /* ── Full paste: values + formatting + borders ── */
+    const changes = [];
+    internalClipboard.grid.forEach((row, ri) => {
+      row.forEach((cell, ci) => {
+        const r = r0 + ri, c = c0 + ci;
+        changes.push([r, c, cell.v]);
+
+        /* Restore formatting */
+        if (!cellFormats[r]) cellFormats[r] = {};
+        if (cell.fmt) cellFormats[r][c] = { ...cell.fmt };
+        else          delete cellFormats[r][c];
+
+        /* Restore borders */
+        if (!cellBorders[r]) cellBorders[r] = {};
+        if (cell.bfmt) cellBorders[r][c] = { ...cell.bfmt };
+        else           delete cellBorders[r][c];
+        applyBorderToCell(r, c);
+      });
+    });
+    hot.setDataAtCell(changes);
+    hot.render();
+  } else if (systemText) {
+    /* ── External paste: TSV only — formatting/borders untouched ── */
+    const parsed = systemText.replace(/\r\n?/g, '\n').trimEnd()
+      .split('\n').map(row => row.split('\t'));
+    hot.setDataAtCell(
+      parsed.flatMap((row, ri) => row.map((v, ci) => [r0 + ri, c0 + ci, v]))
+    );
+  } else {
+    showToast("Concedi l'accesso agli appunti al browser");
+  }
+}
+
+/* ── Keyboard shortcuts ─────────────────────────────────────── */
+document.addEventListener('keydown', async (e) => {
+  if (!(e.ctrlKey || e.metaKey) || e.shiftKey || e.altKey) return;
+
+  if (e.key === 'b') { e.preventDefault(); toggleFmt('bold');           return; }
+  if (e.key === 'i') { e.preventDefault(); toggleFmt('italic');         return; }
+  if (e.key === 'u') { e.preventDefault(); toggleFmt('underline');      return; }
+  if (e.key === 'c') { e.preventDefault(); await copyToClipboard();     return; }
+  if (e.key === 'v') { e.preventDefault(); await pasteFromClipboard();  return; }
+  if (e.key === 'x') {
+    e.preventDefault();
+    await copyToClipboard();
+    const s = hot.getSelected();
+    if (!s) return;
+    const changes = [];
+    for (const [r1, c1, r2, c2] of s)
+      for (let r = Math.min(r1, r2); r <= Math.max(r1, r2); r++)
+        for (let c = Math.min(c1, c2); c <= Math.max(c1, c2); c++)
+          changes.push([r, c, null]);
+    hot.setDataAtCell(changes);
+    return;
+  }
+});
+
+/* ═══════════════════════════════════════════════════════════
+   SVG EXPORT
+═══════════════════════════════════════════════════════════ */
+
+/* Get actual rendered column width */
+function getColW(col) {
+  try { const w = hot.getColWidth(col); return (w > 0) ? w : 50; }
+  catch { return 50; }
+}
+
+/* Get actual rendered row height (from DOM if available, else fallback) */
+function getRowH(row) {
+  const td = hot.getCell(row, 0);
+  if (td?.parentElement) return td.parentElement.offsetHeight || 50;
+  return 50;
+}
+
+document.getElementById('btn-svg').onclick = () => {
+  const sel = hot.getSelected();
+  if (!sel || !sel.length) {
+    showToast('Select cells first!');
+    return;
+  }
+
+  /* Bounding box over all selection rectangles */
+  let rMin = Infinity, rMax = -Infinity;
+  let cMin = Infinity, cMax = -Infinity;
+  for (const [r1, c1, r2, c2] of sel) {
+    rMin = Math.min(rMin, r1, r2); rMax = Math.max(rMax, r1, r2);
+    cMin = Math.min(cMin, c1, c2); cMax = Math.max(cMax, c1, c2);
+  }
+
+  const PAD     = 5;
+  const CBORD_W = 2;
+  const CBORD_C = '#000000';
+
+  const colWidths  = Array.from({ length: cMax - cMin + 1 }, (_, i) => getColW(cMin + i));
+  const rowHeights = Array.from({ length: rMax - rMin + 1 }, (_, i) => getRowH(rMin + i));
+  const totalW = colWidths.reduce((a, b) => a + b, 0);
+  const totalH = rowHeights.reduce((a, b) => a + b, 0);
+
+  let defs  = '<defs>';
+  let cells = '';
+  let yOff  = 0;
+
+  for (let r = rMin; r <= rMax; r++) {
+    const rh = rowHeights[r - rMin];
+    let xOff = 0;
+
+    for (let c = cMin; c <= cMax; c++) {
+      const cw  = colWidths[c - cMin];
+      const uid = `cp_${r}_${c}`;
+
+      /* Clip path — text won't overflow the cell */
+      defs +=
+        `<clipPath id="${uid}">` +
+        `<rect x="${xOff + PAD}" y="${yOff + 1}" ` +
+        `width="${Math.max(0, cw - PAD * 2)}" height="${rh - 2}"/>` +
+        `</clipPath>`;
+
+      const fmt = cellFormats[r]?.[c] || {};
+      const fg  = fmt.color      || '#222222';
+      const fs  = fmt.fontSize   || 18;   /* CSS default */
+      const ff  = fmt.fontFamily || 'Arial';
+      const fw  = fmt.bold       ? 'bold'   : 'normal';
+      const fi  = fmt.italic     ? 'italic' : 'normal';
+      const decParts = [];
+      if (fmt.underline) decParts.push('underline');
+      if (fmt.strike)    decParts.push('line-through');
+      const deco = decParts.join(' ') || 'none';
+      const al   = fmt.align || 'center'; /* CSS default */
+
+      /* Cell background — only when a custom fill color is set;
+         no grid squares exported, only text and custom borders. */
+      if (fmt.bgColor && fmt.bgColor !== '#ffffff') {
+        cells +=
+          `<rect x="${xOff}" y="${yOff}" width="${cw}" height="${rh}" ` +
+          `fill="${fmt.bgColor}"/>`;
+      }
+
+      /* Cell value */
+      const val = hot.getDataAtCell(r, c);
+      if (val !== null && val !== undefined && val !== '') {
+        let tx, anchor;
+        if (al === 'center') { tx = xOff + cw / 2;        anchor = 'middle'; }
+        else if (al === 'right')  { tx = xOff + cw - PAD; anchor = 'end';    }
+        else                      { tx = xOff + PAD;       anchor = 'start';  }
+
+        cells +=
+          `<text x="${tx}" y="${yOff + rh / 2}" ` +
+          `font-family="${escapeXml(ff)}, sans-serif" ` +
+          `font-size="${fs}" font-weight="${fw}" font-style="${fi}" ` +
+          `text-decoration="${deco}" fill="${fg}" ` +
+          `text-anchor="${anchor}" dominant-baseline="middle" ` +
+          `clip-path="url(#${uid})">${escapeXml(String(val))}</text>`;
+      }
+
+      /* Custom cell borders (drawn on top of background, under nothing) */
+      const b = cellBorders[r]?.[c] || {};
+      const bl = `stroke="${CBORD_C}" stroke-width="${CBORD_W}" stroke-linecap="square"`;
+      if (b.top)    cells += `<line x1="${xOff}"    y1="${yOff}"    x2="${xOff+cw}" y2="${yOff}"    ${bl}/>`;
+      if (b.bottom) cells += `<line x1="${xOff}"    y1="${yOff+rh}" x2="${xOff+cw}" y2="${yOff+rh}" ${bl}/>`;
+      if (b.left)   cells += `<line x1="${xOff}"    y1="${yOff}"    x2="${xOff}"    y2="${yOff+rh}" ${bl}/>`;
+      if (b.right)  cells += `<line x1="${xOff+cw}" y1="${yOff}"    x2="${xOff+cw}" y2="${yOff+rh}" ${bl}/>`;
+
+      xOff += cw;
+    }
+    yOff += rh;
+  }
+
+  defs += '</defs>';
+
+  const svg =
+    `<?xml version="1.0" encoding="UTF-8"?>\n` +
+    `<svg xmlns="http://www.w3.org/2000/svg" ` +
+    `width="${totalW}" height="${totalH}" ` +
+    `viewBox="0 0 ${totalW} ${totalH}">\n` +
+    `  ${defs}\n  ${cells}\n</svg>`;
+
+  const blob = new Blob([svg], { type: 'image/svg+xml;charset=utf-8' });
+  const url  = URL.createObjectURL(blob);
+  const a    = Object.assign(document.createElement('a'), {
+    href: url,
+    download: `websheet-${Date.now()}.svg`
+  });
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+
+  showToast(`SVG exported — ${(rMax - rMin + 1) * (cMax - cMin + 1)} cells (${totalW}×${totalH}px).`);
+};
+
+/* ═══════════════════════════════════════════════════════════
+   CUSTOM BORDERS
+   Uses Handsontable's built-in customBorders plugin.
+   State is tracked in cellBorders[row][col] = { top, right, bottom, left }
+═══════════════════════════════════════════════════════════ */
+const cellBorders   = {};
+const BORDER_ON     = { width: 1, color: '#000000' };
+const BORDER_OFF    = false;   // passing false removes that side in HoT
+
+function getBordFmt(row, col) {
+  if (!cellBorders[row]) cellBorders[row] = {};
+  if (!cellBorders[row][col]) cellBorders[row][col] = {};
+  return cellBorders[row][col];
+}
+
+function applyBorderToCell(row, col) {
+  const plugin = hot.getPlugin('customBorders');
+  const b      = cellBorders[row]?.[col] || {};
+  const hasAny = b.top || b.right || b.bottom || b.left;
+
+  if (!hasAny) {
+    plugin.clearBorders([[row, col, row, col]]);
+    return;
+  }
+  plugin.setBorders([[row, col, row, col]], {
+    top:    b.top    ? BORDER_ON : BORDER_OFF,
+    right:  b.right  ? BORDER_ON : BORDER_OFF,
+    bottom: b.bottom ? BORDER_ON : BORDER_OFF,
+    left:   b.left   ? BORDER_ON : BORDER_OFF,
+  });
+}
+
+function toggleBorder(side) {
+  const sel = hot.getSelected();
+  if (!sel || !sel.length) return;
+
+  /* Enable or disable based on the anchor cell (first in first area) */
+  const enable = !getBordFmt(sel[0][0], sel[0][1])[side];
+
+  for (const [r1, c1, r2, c2] of sel) {
+    const rMin = Math.min(r1, r2), rMax = Math.max(r1, r2);
+    const cMin = Math.min(c1, c2), cMax = Math.max(c1, c2);
+    for (let r = rMin; r <= rMax; r++) {
+      for (let c = cMin; c <= cMax; c++) {
+        getBordFmt(r, c)[side] = enable;
+        applyBorderToCell(r, c);
+      }
+    }
+  }
+  syncToolbar(sel[0][0], sel[0][1]);
+}
+
+document.getElementById('btn-bord-t').onclick = () => toggleBorder('top');
+document.getElementById('btn-bord-l').onclick = () => toggleBorder('left');
+document.getElementById('btn-bord-b').onclick = () => toggleBorder('bottom');
+document.getElementById('btn-bord-r').onclick = () => toggleBorder('right');
+
+/* Outer border: draws a border only on the perimeter of the selection box,
+   leaving inner cells untouched. */
+document.getElementById('btn-bord-a').onclick = () => {
+  const sel = hot.getSelected();
+  if (!sel || !sel.length) return;
+
+  /* Compute the overall bounding box across all selection areas */
+  let rMin = Infinity, rMax = -Infinity, cMin = Infinity, cMax = -Infinity;
+  for (const [r1, c1, r2, c2] of sel) {
+    rMin = Math.min(rMin, r1, r2); rMax = Math.max(rMax, r1, r2);
+    cMin = Math.min(cMin, c1, c2); cMax = Math.max(cMax, c1, c2);
+  }
+
+  for (let r = rMin; r <= rMax; r++) {
+    for (let c = cMin; c <= cMax; c++) {
+      const onEdge = r === rMin || r === rMax || c === cMin || c === cMax;
+      if (!onEdge) continue;
+      const b = getBordFmt(r, c);
+      if (r === rMin) b.top    = true;
+      if (r === rMax) b.bottom = true;
+      if (c === cMin) b.left   = true;
+      if (c === cMax) b.right  = true;
+      applyBorderToCell(r, c);
+    }
+  }
+  syncToolbar(sel[0][0], sel[0][1]);
+};
+
+/* ═══════════════════════════════════════════════════════════
+   GRID TOGGLE
+═══════════════════════════════════════════════════════════ */
+let gridVisible = true;
+document.getElementById('btn-grid').onclick = () => {
+  gridVisible = !gridVisible;
+  document.getElementById('sheet-wrap').classList.toggle('hide-grid', !gridVisible);
+  document.getElementById('btn-grid').classList.toggle('active', gridVisible);
+};
+
+/* Resize */
+window.addEventListener('resize', () => hot.refreshDimensions());
+
+/* ═══════════════════════════════════════════════════════════
+   IMPORT / EXPORT
+   • xlsx/ods/csv — via SheetJS (data only)
+   • .wsheet      — JSON snapshot with data + formatting + borders
+═══════════════════════════════════════════════════════════ */
+
+/* ── Export: .wsheet (full state — data + formatting + borders) ── */
+function exportWSheet() {
+  /* Trim trailing empty rows from data */
+  const raw = hot.getData();
+  let lastRow = raw.length - 1;
+  while (lastRow >= 0 && raw[lastRow].every(v => v === null || v === '')) lastRow--;
+
+  const state = {
+    version: 1,
+    data:    raw.slice(0, lastRow + 1),
+    formats: cellFormats,
+    borders: cellBorders,
+  };
+  const json = JSON.stringify(state);
+  const blob = new Blob([json], { type: 'application/json;charset=utf-8' });
+  const url  = URL.createObjectURL(blob);
+  const a    = Object.assign(document.createElement('a'), {
+    href: url, download: `websheet-${Date.now()}.wsheet`,
+  });
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+  showToast('Saved: websheet.wsheet');
+}
+
+/* ── .wsheet loader (shared by file import and auto-load) ── */
+function loadWSheetText(text, name) {
+  const state = JSON.parse(text);
+  if (!state || state.version !== 1) throw new Error('Invalid format');
+
+  /* Clear current state */
+  Object.keys(cellFormats).forEach(k => delete cellFormats[k]);
+  Object.keys(cellBorders).forEach(k => delete cellBorders[k]);
+  hot.getPlugin('customBorders').clearBorders();
+
+  /* Load data first */
+  hot.loadData(state.data || []);
+
+  /* Restore formatting */
+  if (state.formats) {
+    Object.entries(state.formats).forEach(([r, cols]) =>
+      Object.entries(cols).forEach(([c, fmt]) => {
+        if (!cellFormats[r]) cellFormats[r] = {};
+        cellFormats[r][c] = fmt;
+      })
+    );
+  }
+
+  /* Restore borders */
+  if (state.borders) {
+    Object.entries(state.borders).forEach(([r, cols]) =>
+      Object.entries(cols).forEach(([c, bfmt]) => {
+        if (!cellBorders[r]) cellBorders[r] = {};
+        cellBorders[r][c] = bfmt;
+        applyBorderToCell(parseInt(r), parseInt(c));
+      })
+    );
+  }
+
+  hot.render();
+  if (name) showToast(`Opened: ${name}`);
+}
+
+/* ── Import: detect format and load ── */
+function handleFileImport(file) {
+  if (!file) return;
+  const name = file.name.toLowerCase();
+
+  if (name.endsWith('.wsheet')) {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try { loadWSheetText(e.target.result, file.name); }
+      catch (err) { showToast(`Error: ${err.message}`); }
+    };
+    reader.readAsText(file);
+
+  } else {
+    /* ── xlsx / ods / csv / xls: SheetJS (data only) ── */
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const data = new Uint8Array(e.target.result);
+        const wb   = XLSX.read(data, { type: 'array' });
+        const ws   = wb.Sheets[wb.SheetNames[0]];
+        const aoa  = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+
+        /* Clear formatting and borders — file carries none */
+        Object.keys(cellFormats).forEach(k => delete cellFormats[k]);
+        Object.keys(cellBorders).forEach(k => delete cellBorders[k]);
+        hot.getPlugin('customBorders').clearBorders();
+
+        hot.loadData(aoa);
+        showToast(`Opened: ${file.name} (${wb.SheetNames[0]})`);
+      } catch (err) {
+        showToast(`Error reading file: ${err.message}`);
+      }
+    };
+    reader.readAsArrayBuffer(file);
+  }
+}
+
+/* ── Wire buttons ── */
+const fileInput = document.getElementById('file-input');
+fileInput.addEventListener('change', (e) => {
+  handleFileImport(e.target.files[0]);
+  e.target.value = ''; /* reset so the same file can be opened again */
+});
+
+document.getElementById('btn-open').onclick    = () => fileInput.click();
+document.getElementById('btn-save-ws').onclick = exportWSheet;
+
+/* ── Auto-load template on startup ── */
+fetch('./data/template.wsheet')
+  .then(r => { if (!r.ok) throw new Error(); return r.text(); })
+  .then(text => { try { loadWSheetText(text, null); } catch (_) {} })
+  .catch(() => {}); /* silently skip if file is missing */
+</script>
+</body>
+</html>
