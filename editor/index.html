@@ -11,6 +11,14 @@
   <!-- SheetJS — reads/writes xlsx, ods, csv and many other formats -->
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 
+  <!-- Firebase SDK (compat v10) -->
+  <script src="https://www.gstatic.com/firebasejs/10.0.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.0.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.0.0/firebase-storage-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.0.0/firebase-database-compat.js"></script>
+  <!-- Firebase config — file locale (gitignored), generato da GitHub Actions in produzione -->
+  <script src="firebase-config.js"></script>
+
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     html, body { height: 100%; overflow: hidden; }
@@ -191,17 +199,75 @@
       padding: 4px 0;
     }
     .file-entry {
-      padding: 7px 12px;
+      padding: 5px 6px 5px 12px;
       font-size: 12px;
       cursor: pointer;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
       color: #333;
       user-select: none;
+      display: flex;
+      align-items: center;
+      gap: 2px;
     }
-    .file-entry:hover    { background: #f1f3f4; }
-    .file-entry.active   { background: #e8f0fe; color: #1a73e8; font-weight: 600; }
+    .file-entry:hover  { background: #f1f3f4; }
+    .file-entry.active { background: #e8f0fe; color: #1a73e8; font-weight: 600; }
+    .file-entry-name {
+      flex: 1;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      line-height: 1.4;
+    }
+    .file-entry-actions {
+      display: flex; gap: 1px; flex-shrink: 0;
+      opacity: 0; transition: opacity .12s;
+    }
+    .file-entry:hover .file-entry-actions,
+    .file-entry.active .file-entry-actions { opacity: 1; }
+    .fe-btn {
+      width: 22px; height: 22px;
+      border: none; background: transparent;
+      border-radius: 3px; cursor: pointer;
+      font-size: 12px; padding: 0;
+      display: flex; align-items: center; justify-content: center;
+      color: #888; flex-shrink: 0; line-height: 1;
+    }
+    .fe-btn:hover { background: rgba(0,0,0,.08); color: #333; }
+    .fe-btn.del:hover { color: #c62828; background: rgba(198,40,40,.1); }
+
+    /* ── File panel footer ─────────────────────────────── */
+    #file-panel-footer { border-top: 1px solid #e0e0e0; padding: 7px 8px; flex-shrink: 0; }
+    #btn-new-file {
+      width: 100%; height: 28px;
+      border: 1px dashed #ccc; background: transparent;
+      border-radius: 4px; cursor: pointer;
+      font-size: 12px; color: #888;
+      transition: background .15s, border-color .15s, color .15s;
+      display: none; /* shown only when logged in */
+    }
+    #btn-new-file:hover { background: #f1f3f4; border-color: #999; color: #333; }
+
+    /* ── Library modals (name input + confirm delete) ─── */
+    #libname-overlay, #libdel-overlay {
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,.5);
+      display: flex; align-items: center; justify-content: center;
+      z-index: 10000;
+      opacity: 0; pointer-events: none;
+      transition: opacity .2s;
+    }
+    #libname-overlay.show, #libdel-overlay.show { opacity: 1; pointer-events: auto; }
+    #libname-box, #libdel-box {
+      background: #fff; border-radius: 8px;
+      padding: 24px 28px; width: 300px;
+      box-shadow: 0 8px 32px rgba(0,0,0,.25);
+    }
+    #libname-box h2, #libdel-box p {
+      font-size: 14px; color: #222; margin-bottom: 16px;
+    }
+    #libdel-box p { font-weight: 400; line-height: 1.5; margin-bottom: 0; }
+    #libname-error { color: #d32f2f; font-size: 12px; min-height: 16px; margin-bottom: 8px; }
+    #btn-libdel-ok { background: #c62828 !important; }
+    #btn-libdel-ok:hover { background: #b71c1c !important; }
 
     /* Handsontable tweaks */
     .handsontable .htCore td {
@@ -251,6 +317,7 @@
       height: 24px;
     }
     #st-msg { margin-left: auto; color: #1a73e8; font-weight: 500; }
+    #editing-warning { color: #e65100; font-weight: 500; display: none; }
 
     /* ── Toast notification ───────────────────────────────── */
     #toast {
@@ -262,6 +329,82 @@
       z-index: 9999;
     }
     #toast.show { opacity: 1; }
+
+    /* ── Auth area (app-bar right side) ──────────────────── */
+    #auth-area { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+    #btn-login {
+      background: rgba(255,255,255,.2);
+      color: #fff;
+      border: 1px solid rgba(255,255,255,.5);
+      border-radius: 4px;
+      height: 28px; padding: 0 12px;
+      font-size: 12px; font-weight: 600; cursor: pointer;
+      transition: background .15s;
+    }
+    #btn-login:hover { background: rgba(255,255,255,.35); }
+    #user-info { display: none; align-items: center; gap: 8px; color: #fff; }
+    #user-email { font-size: 12px; opacity: .85; max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    #btn-logout {
+      background: rgba(255,255,255,.15);
+      color: #fff; border: 1px solid rgba(255,255,255,.4);
+      border-radius: 4px; height: 24px; padding: 0 8px;
+      font-size: 11px; cursor: pointer; transition: background .15s;
+    }
+    #btn-logout:hover { background: rgba(255,255,255,.3); }
+
+    /* ── Login modal ────────────────────────────────────── */
+    #login-overlay {
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,.5);
+      display: flex; align-items: center; justify-content: center;
+      z-index: 10000;
+      opacity: 0; pointer-events: none;
+      transition: opacity .2s;
+    }
+    #login-overlay.show { opacity: 1; pointer-events: auto; }
+    #login-box {
+      background: #fff; border-radius: 8px;
+      padding: 28px 32px; width: 320px;
+      box-shadow: 0 8px 32px rgba(0,0,0,.25);
+    }
+    #login-box h2 { font-size: 17px; font-weight: 700; color: #222; margin-bottom: 20px; }
+    .login-field { margin-bottom: 14px; }
+    .login-field label { display: block; font-size: 12px; color: #555; margin-bottom: 4px; font-weight: 500; }
+    .login-field input {
+      width: 100%; height: 34px;
+      border: 1px solid #ccc; border-radius: 4px;
+      padding: 0 10px; font-size: 13px;
+      transition: border-color .15s;
+    }
+    .login-field input:focus { outline: none; border-color: #4285f4; }
+    #login-error { color: #d32f2f; font-size: 12px; margin-bottom: 10px; min-height: 16px; }
+    .login-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 4px; }
+    .login-actions button {
+      height: 32px; border-radius: 4px;
+      font-size: 13px; font-weight: 600;
+      cursor: pointer; padding: 0 18px;
+      border: none; transition: background .15s;
+    }
+    #btn-login-cancel { background: #f1f3f4; color: #444; }
+    #btn-login-cancel:hover { background: #e2e5e9; }
+    #btn-login-submit { background: #1a73e8; color: #fff; }
+    #btn-login-submit:hover { background: #1558b0; }
+    #btn-login-submit:disabled { background: #aaa; cursor: default; }
+
+    /* ── Save in Cloud button ────────────────────────────── */
+    #btn-save-cloud {
+      background: #34a853; color: #fff;
+      border: none; border-radius: 4px;
+      height: 28px; padding: 0 14px;
+      font-size: 13px; font-weight: 600;
+      cursor: pointer;
+      display: none; /* shown only when logged in */
+      align-items: center; gap: 6px;
+      transition: background .15s;
+      flex-shrink: 0;
+    }
+    #btn-save-cloud:hover { background: #2d9144; }
+    #btn-save-cloud:disabled { background: #aaa; cursor: default; }
   </style>
 </head>
 <body>
@@ -271,6 +414,15 @@
   <div id="app-logo">&#9783;</div>
   <span id="app-title">POINTS</span>
   <span id="app-subtitle">Sequences Editor</span>
+
+  <!-- Auth area -->
+  <div id="auth-area">
+    <button id="btn-login" onclick="showLoginModal()">&#128274; Login</button>
+    <div id="user-info">
+      <span id="user-email"></span>
+      <button id="btn-logout" onclick="logoutUser()">Logout</button>
+    </div>
+  </div>
 </div>
 
 <!-- ── Toolbar ──────────────────────────────────────────────────────────── -->
@@ -350,6 +502,8 @@
     title="Open file (xlsx, ods, csv, .wsheet, Google Sheets html)">&#128193; Open</button>
   <button class="tb-btn" id="btn-save-ws"
     title="Save full sheet with formatting and borders (.wsheet)">&#8659; Save</button>
+  <button id="btn-save-cloud" onclick="saveToCloud()"
+    title="Overwrite file on Firebase Cloud Storage">&#9729; Save in cloud</button>
 
   <div class="tb-sep"></div>
 
@@ -374,6 +528,9 @@
   <div id="file-panel" class="closed">
     <div id="file-panel-header">&#128218; Library</div>
     <div id="file-list"></div>
+    <div id="file-panel-footer">
+      <button id="btn-new-file" onclick="showNewFileModal()" title="Create new file">+ New file</button>
+    </div>
   </div>
 </div>
 
@@ -382,11 +539,59 @@
   <span id="st-cells">Ready</span>
   <span id="st-avg"></span>
   <span id="st-sum"></span>
+  <span id="editing-warning"></span>
   <span id="st-msg"></span>
 </div>
 
 <!-- Toast -->
 <div id="toast"></div>
+
+<!-- ── Login modal ──────────────────────────────────────────────────────── -->
+<div id="login-overlay">
+  <div id="login-box">
+    <h2>&#128274; Sign in</h2>
+    <div class="login-field">
+      <label for="login-email">Email</label>
+      <input type="email" id="login-email" placeholder="your@email.com" autocomplete="email">
+    </div>
+    <div class="login-field">
+      <label for="login-password">Password</label>
+      <input type="password" id="login-password" placeholder="Password" autocomplete="current-password">
+    </div>
+    <div id="login-error"></div>
+    <div class="login-actions">
+      <button id="btn-login-cancel" onclick="hideLoginModal()">Cancel</button>
+      <button id="btn-login-submit" onclick="submitLogin()">Sign in</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── File name input modal (new file / rename) ────────────────────────── -->
+<div id="libname-overlay">
+  <div id="libname-box">
+    <h2 id="libname-title">New file</h2>
+    <div class="login-field">
+      <label for="libname-input">File name</label>
+      <input type="text" id="libname-input" placeholder="e.g. My Table">
+    </div>
+    <div id="libname-error"></div>
+    <div class="login-actions">
+      <button class="login-actions" id="btn-libname-cancel" onclick="hideLibNameModal()" style="background:#f1f3f4;color:#444;height:32px;border-radius:4px;font-size:13px;font-weight:600;cursor:pointer;padding:0 18px;border:none;">Cancel</button>
+      <button id="btn-libname-ok" onclick="submitLibName()" style="background:#1a73e8;color:#fff;height:32px;border-radius:4px;font-size:13px;font-weight:600;cursor:pointer;padding:0 18px;border:none;">OK</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Delete confirm modal ──────────────────────────────────────────────── -->
+<div id="libdel-overlay">
+  <div id="libdel-box">
+    <p id="libdel-msg"></p>
+    <div class="login-actions" style="margin-top:16px;">
+      <button onclick="hideLibDelModal()" style="background:#f1f3f4;color:#444;height:32px;border-radius:4px;font-size:13px;font-weight:600;cursor:pointer;padding:0 18px;border:none;">Cancel</button>
+      <button id="btn-libdel-ok" onclick="submitLibDel()" style="color:#fff;height:32px;border-radius:4px;font-size:13px;font-weight:600;cursor:pointer;padding:0 18px;border:none;">Delete</button>
+    </div>
+  </div>
+</div>
 
 <script>
 'use strict';
@@ -414,6 +619,7 @@ function applyFmt(props) {
       for (let c = cMin; c <= cMax; c++)
         Object.assign(getFmt(r, c), props);
   }
+  _isDirty = true;
   hot.render();
   const s = hot.getSelected();
   if (s && s.length) syncToolbar(s[0][0], s[0][1]);
@@ -551,17 +757,26 @@ const hot = new Handsontable(document.getElementById('sheet'), {
     /* ── Borders (virtual rendering — only visible cells) ──────────────────
        We must set style+width+color together: color/width alone won't draw
        a border if borderStyle is still 'none' (HoT only sets right/bottom
-       as default grid lines; top/left have no CSS border at all).       */
+       as default grid lines; top/left have no CSS border at all).
+       We also mirror borders from neighboring cells: if the cell above has
+       a bottom border, this cell inherits a top border (and so on for all
+       four sides). This prevents white gaps at shared edges regardless of
+       whether the table uses border-collapse:collapse or separate.        */
     const b      = cellBorders[row]?.[col] || {};
     const hidden = !gridVisible;
+    const bOn = [
+      b.top    || !!(cellBorders[row - 1]?.[col]?.bottom),
+      b.right  || !!(cellBorders[row]?.[col + 1]?.left),
+      b.bottom || !!(cellBorders[row + 1]?.[col]?.top),
+      b.left   || !!(cellBorders[row]?.[col - 1]?.right),
+    ];
     const bSides = ['Top', 'Right', 'Bottom', 'Left'];
-    const bKeys  = ['top', 'right', 'bottom', 'left'];
     for (let _i = 0; _i < 4; _i++) {
       const S  = bSides[_i];
-      const on = b[bKeys[_i]];
+      const on = bOn[_i];
       if (on) {
         TD.style['border' + S + 'Style'] = 'solid';
-        TD.style['border' + S + 'Width'] = '1.5px';
+        TD.style['border' + S + 'Width'] = '1px';
         TD.style['border' + S + 'Color'] = '#000000';
       } else if (hidden) {
         TD.style['border' + S + 'Style'] = 'solid';
@@ -583,6 +798,7 @@ const hot = new Handsontable(document.getElementById('sheet'), {
 
   afterChange(changes) {
     if (!changes) return;
+    _isDirty = true;
     const s = hot.getSelected();
     if (s && s.length) updateFormulaBar(s[0][0], s[0][1]);
     updateStatus();
@@ -686,6 +902,7 @@ document.getElementById('btn-clear-fmt').onclick = () => {
       }
     }
   }
+  _isDirty = true;
   hot.render();
   const s = hot.getSelected();
   if (s && s.length) syncToolbar(s[0][0], s[0][1]);
@@ -991,6 +1208,7 @@ function toggleBorder(side) {
       for (let c = cMin; c <= cMax; c++)
         getBordFmt(r, c)[side] = enable;
   }
+  _isDirty = true;
   hot.render();
   syncToolbar(sel[0][0], sel[0][1]);
 }
@@ -1024,6 +1242,7 @@ document.getElementById('btn-bord-a').onclick = () => {
       if (c === cMax) b.right  = true;
     }
   }
+  _isDirty = true;
   hot.render();
   syncToolbar(sel[0][0], sel[0][1]);
 };
@@ -1115,6 +1334,7 @@ async function loadWSheetText(text, name) {
   }
 
   hot.render(); /* single render — afterRenderer applies formats + borders for visible cells */
+  _isDirty = false;
   document.getElementById('st-msg').textContent = '';
   if (name) showToast(`Opened: ${name}`);
 }
@@ -1347,37 +1567,16 @@ function toggleLibrary() {
   libraryOpen = !libraryOpen;
   filePanel.classList.toggle('closed', !libraryOpen);
   btnLibrary.classList.toggle('active', libraryOpen);
-  if (libraryOpen) hot.refreshDimensions();
-}
-
-function loadLibraryFile(filename, entryEl) {
-  fetch(`./data/${encodeURIComponent(filename)}`)
-    .then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.text(); })
-    .then(async text => {
-      await loadWSheetText(text, filename);
-      if (activeEntry) activeEntry.classList.remove('active');
-      activeEntry = entryEl;
-      entryEl.classList.add('active');
-    })
-    .catch(err => showToast(`Error loading ${filename}: ${err.message}`));
-}
-
-fetch('./data/index.json')
-  .then(r => r.json())
-  .then(files => {
-    fileListEl.innerHTML = '';
-    for (const f of files) {
-      const el = document.createElement('div');
-      el.className = 'file-entry';
-      el.title = f;
-      el.textContent = f.replace(/\.wsheet$/i, '');
-      el.onclick = () => loadLibraryFile(f, el);
-      fileListEl.appendChild(el);
+  if (libraryOpen) {
+    hot.refreshDimensions();
+    /* Load from Firebase if the user is logged in, otherwise prompt */
+    if (typeof currentUser !== 'undefined' && currentUser) {
+      loadFirebaseLibrary();
+    } else {
+      fileListEl.innerHTML = '<div style="padding:10px;color:#aaa;font-size:11px;">Login to access the library</div>';
     }
-  })
-  .catch(() => {
-    fileListEl.innerHTML = '<div style="padding:10px;color:#aaa;font-size:11px;">No files found</div>';
-  });
+  }
+}
 
 btnLibrary.onclick = toggleLibrary;
 
@@ -1386,6 +1585,459 @@ fetch('./data/template.wsheet')
   .then(r => { if (!r.ok) throw new Error(); return r.text(); })
   .then(text => loadWSheetText(text, null).catch(() => {}))
   .catch(() => {}); /* silently skip if file is missing */
+
+/* firebaseConfig è caricato da firebase-config.js (esterno, gitignored) */
+
+/* Folder inside Firebase Storage that contains the .wsheet files */
+const STORAGE_FOLDER = 'tables';
+
+/* Declared with let (not const) to avoid Temporal Dead Zone if init fails */
+let auth       = null;
+let storage    = null;
+let realtimeDb = null;
+let currentUser      = null;
+let currentCloudFile = null;
+let _isDirty         = false;
+
+try {
+  if (typeof firebase === 'undefined') throw new Error('Firebase SDK not loaded. Check your internet connection.');
+  const app = firebase.apps.length ? firebase.apps[0] : firebase.initializeApp(firebaseConfig);
+  auth    = firebase.auth(app);
+  storage = firebase.storage(app);
+  try { realtimeDb = firebase.database(app); } catch(e) { console.warn('RTDB not available:', e.message); }
+} catch (e) {
+  console.error('Firebase init error:', e);
+  showToast('Firebase error: ' + e.message);
+}
+
+/* ─── Realtime DB — presence & version helpers ─────────── */
+
+/* Convert filename to a valid RTDB key (no . # $ / [ ]) */
+function safeKey(filename) { return filename.replace(/[.#$\/\[\]]/g, '_'); }
+
+let _presenceRef    = null;  /* ref: p/{key}/{uid}  — current user's presence node */
+let _editingRef     = null;  /* ref: p/{key}        — all editors on current file  */
+let _openedVersion  = null;  /* version timestamp when current file was opened     */
+
+function _clearPresence() {
+  if (_presenceRef) { _presenceRef.onDisconnect().cancel(); _presenceRef.remove(); _presenceRef = null; }
+  if (_editingRef)  { _editingRef.off(); _editingRef = null; }
+  _openedVersion = null;
+  const w = document.getElementById('editing-warning');
+  w.style.display = 'none'; w.textContent = '';
+}
+
+async function _setPresence(filename) {
+  if (!realtimeDb || !currentUser) return;
+  const key = safeKey(filename);
+  _presenceRef = realtimeDb.ref(`p/${key}/${currentUser.uid}`);
+  _editingRef  = realtimeDb.ref(`p/${key}`);
+  _presenceRef.onDisconnect().remove();          /* auto-cleanup on disconnect */
+  await _presenceRef.set(currentUser.email);
+  _editingRef.on('value', snap => {
+    const editors = snap.val() || {};
+    const others = Object.values(
+      Object.fromEntries(Object.entries(editors).filter(([uid]) => uid !== currentUser.uid))
+    );
+    const w = document.getElementById('editing-warning');
+    if (others.length) { w.textContent = `✎ Also editing: ${others.join(', ')}`; w.style.display = ''; }
+    else               { w.textContent = ''; w.style.display = 'none'; }
+  });
+}
+
+async function _getVersion(filename) {
+  if (!realtimeDb) return null;
+  const snap = await realtimeDb.ref(`v/${safeKey(filename)}`).once('value');
+  return snap.val();
+}
+
+async function _setVersion(filename) {
+  if (!realtimeDb) return;
+  const v = Date.now();
+  await realtimeDb.ref(`v/${safeKey(filename)}`).set(v);
+  _openedVersion = v;
+}
+
+async function _versionConflict(filename) {
+  if (!realtimeDb || _openedVersion === null) return false;
+  const current = await _getVersion(filename);
+  return current !== null && current !== _openedVersion;
+}
+
+/* ─── Auth state observer ─────────────────────────────── */
+if (auth) auth.onAuthStateChanged(user => {
+  currentUser = user;
+  if (user) {
+    document.getElementById('user-email').textContent    = user.email;
+    document.getElementById('user-info').style.display   = 'flex';
+    document.getElementById('btn-login').style.display   = 'none';
+    document.getElementById('btn-save-cloud').style.display = 'inline-flex';
+    document.getElementById('btn-new-file').style.display   = 'block';
+    /* If the library panel is already open, refresh it from Firebase */
+    if (libraryOpen) loadFirebaseLibrary();
+  } else {
+    document.getElementById('user-info').style.display   = 'none';
+    document.getElementById('btn-login').style.display   = '';
+    document.getElementById('btn-save-cloud').style.display = 'none';
+    document.getElementById('btn-new-file').style.display   = 'none';
+    currentCloudFile = null;
+  }
+});
+
+/* ─── Login modal ─────────────────────────────────────── */
+function showLoginModal() {
+  document.getElementById('login-email').value       = '';
+  document.getElementById('login-password').value    = '';
+  document.getElementById('login-error').textContent  = '';
+  document.getElementById('btn-login-submit').disabled = false;
+  document.getElementById('login-overlay').classList.add('show');
+  setTimeout(() => document.getElementById('login-email').focus(), 150);
+}
+
+function hideLoginModal() {
+  document.getElementById('login-overlay').classList.remove('show');
+}
+
+async function submitLogin() {
+  const email    = document.getElementById('login-email').value.trim();
+  const password = document.getElementById('login-password').value;
+  const errEl    = document.getElementById('login-error');
+  const btn      = document.getElementById('btn-login-submit');
+  if (!auth) { errEl.textContent = 'Firebase not available. Check your connection and reload the page.'; return; }
+  if (!email || !password) { errEl.textContent = 'Insert email and password.'; return; }
+
+  btn.disabled = true;
+  errEl.textContent = '';
+  try {
+    await auth.signInWithEmailAndPassword(email, password);
+    hideLoginModal();
+    showToast('Login successful!');
+  } catch (err) {
+    btn.disabled = false;
+    const msgs = {
+      'auth/user-not-found':    'User not found.',
+      'auth/wrong-password':    'Wrong password.',
+      'auth/invalid-email':     'Invalid email.',
+      'auth/too-many-requests': 'Too many attempts. Try again later.',
+      'auth/invalid-credential':'Invalid credentials.',
+    };
+    errEl.textContent = msgs[err.code] || `Error: ${err.message}`;
+  }
+}
+
+function logoutUser() {
+  if (!auth) return;
+  _clearPresence();
+  auth.signOut().then(() => {
+    showToast('Logged out.');
+    if (libraryOpen) {
+      fileListEl.innerHTML = '<div style="padding:10px;color:#aaa;font-size:11px;">Login to access the library</div>';
+    }
+  });
+}
+
+/* Enter key in login fields */
+document.getElementById('login-email').addEventListener('keydown', e => {
+  if (e.key === 'Enter') document.getElementById('login-password').focus();
+});
+document.getElementById('login-password').addEventListener('keydown', e => {
+  if (e.key === 'Enter') submitLogin();
+});
+/* Close modal by clicking outside */
+document.getElementById('login-overlay').addEventListener('click', e => {
+  if (e.target === document.getElementById('login-overlay')) hideLoginModal();
+});
+
+/* ─── Firebase Storage — Library ──────────────────────── */
+async function loadFirebaseLibrary() {
+  if (!storage) { fileListEl.innerHTML = '<div style="padding:10px;color:#d32f2f;font-size:11px;">Firebase not available</div>'; return; }
+  fileListEl.innerHTML = '<div style="padding:10px;color:#aaa;font-size:11px;">Loading…</div>';
+  try {
+    const ref    = storage.ref(STORAGE_FOLDER);
+    const result = await ref.listAll();
+    const files  = result.items
+      .filter(item => item.name.toLowerCase().endsWith('.wsheet'))
+      .map(item => item.name)
+      .sort((a, b) => a.localeCompare(b));
+
+    if (files.length === 0) {
+      fileListEl.innerHTML = '<div style="padding:10px;color:#aaa;font-size:11px;">No files found</div>';
+      return;
+    }
+    fileListEl.innerHTML = '';
+    for (const f of files) {
+      fileListEl.appendChild(makeFileEntry(f));
+    }
+  } catch (err) {
+    fileListEl.innerHTML = `<div style="padding:10px;color:#d32f2f;font-size:11px;">Error: ${err.message}</div>`;
+  }
+}
+
+async function autoSaveCurrentFile() {
+  if (!storage || !currentUser || !currentCloudFile) return;
+  if (!_isDirty) return;
+  /* Skip auto-save if someone else modified the file in the meantime */
+  if (await _versionConflict(currentCloudFile)) {
+    showToast(`⚠ Auto-save skipped: "${currentCloudFile}" was modified by another user.`);
+    return;
+  }
+  const raw = hot.getData();
+  let lastRow = raw.length - 1;
+  while (lastRow >= 0 && raw[lastRow].every(v => v === null || v === '')) lastRow--;
+  const blob = new Blob([JSON.stringify({ version:1, data: raw.slice(0, lastRow+1), formats: cellFormats, borders: cellBorders })],
+                        { type: 'application/json;charset=utf-8' });
+  try {
+    await storage.ref(`${STORAGE_FOLDER}/${currentCloudFile}`).put(blob, { contentType: 'application/json' });
+    await _setVersion(currentCloudFile);
+    _isDirty = false;
+    showToast(`Auto-saved: ${currentCloudFile}`);
+  } catch (err) {
+    showToast(`Auto-save failed: ${err.message}`);
+  }
+}
+
+async function loadFirebaseFile(filename, entryEl) {
+  /* Auto-save the currently open cloud file before switching */
+  if (currentCloudFile && currentCloudFile !== filename) {
+    await autoSaveCurrentFile();
+  }
+  /* Clear presence for the previous file */
+  _clearPresence();
+  try {
+    const url  = await storage.ref(`${STORAGE_FOLDER}/${filename}`).getDownloadURL();
+    const resp = await fetch(url);
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    const text = await resp.text();
+    await loadWSheetText(text, filename);
+    if (activeEntry) activeEntry.classList.remove('active');
+    activeEntry = entryEl;
+    entryEl.classList.add('active');
+    currentCloudFile = filename;
+    /* Read version + register presence (fires real-time warning if others are editing) */
+    _openedVersion = await _getVersion(filename);
+    await _setPresence(filename);
+  } catch (err) {
+    showToast(`Error loading ${filename}: ${err.message}`);
+  }
+}
+
+/* ─── Save in Cloud ───────────────────────────────────── */
+async function saveToCloud() {
+  if (!auth || !storage) { showToast('Firebase not available.'); return; }
+  if (!currentUser) { showToast('You must be logged in to save.'); return; }
+
+  /* Build the .wsheet JSON (same as exportWSheet) */
+  const raw = hot.getData();
+  let lastRow = raw.length - 1;
+  while (lastRow >= 0 && raw[lastRow].every(v => v === null || v === '')) lastRow--;
+  const state = {
+    version: 1,
+    data:    raw.slice(0, lastRow + 1),
+    formats: cellFormats,
+    borders: cellBorders,
+  };
+  const json = JSON.stringify(state);
+  const blob = new Blob([json], { type: 'application/json;charset=utf-8' });
+
+  /* Use the current Firebase filename, or ask for a new one */
+  let filename = currentCloudFile;
+  if (!filename) {
+    const name = prompt('File name to save (without extension):');
+    if (!name) return;
+    filename = name.trim().replace(/\.wsheet$/i, '') + '.wsheet';
+  }
+
+  const btn = document.getElementById('btn-save-cloud');
+  btn.disabled = true;
+  btn.textContent = '⏳ Saving…';
+
+  try {
+    /* Version conflict check — warn before overwriting */
+    if (await _versionConflict(filename)) {
+      const overwrite = confirm(`⚠ "${filename}" was modified by another user since you opened it.\n\nOverwrite their changes?`);
+      if (!overwrite) { btn.disabled = false; btn.innerHTML = '&#9729; Save in cloud'; return; }
+    }
+    await storage.ref(`${STORAGE_FOLDER}/${filename}`).put(blob, { contentType: 'application/json' });
+    await _setVersion(filename);
+    currentCloudFile = filename;
+    _isDirty = false;
+    showToast(`✓ Saved to cloud: ${filename}`);
+    /* Refresh library list if open */
+    if (libraryOpen) loadFirebaseLibrary();
+  } catch (err) {
+    showToast(`✗ Upload failed: ${err.message}`);
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '&#9729; Save in cloud';
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════
+   LIBRARY — CREATE / RENAME / DELETE
+═══════════════════════════════════════════════════════════ */
+
+/* Build a file-entry element with name + action buttons */
+function makeFileEntry(filename) {
+  const el = document.createElement('div');
+  el.className = 'file-entry';
+  el.dataset.filename = filename;
+
+  const nameEl = document.createElement('span');
+  nameEl.className = 'file-entry-name';
+  nameEl.textContent = filename.replace(/\.wsheet$/i, '');
+  nameEl.title = filename;
+  nameEl.onclick = () => loadFirebaseFile(filename, el);
+
+  const actions = document.createElement('span');
+  actions.className = 'file-entry-actions';
+
+  const btnRename = document.createElement('button');
+  btnRename.className = 'fe-btn';
+  btnRename.title = 'Rename';
+  btnRename.textContent = '✎';
+  btnRename.onclick = e => { e.stopPropagation(); showRenameModal(filename); };
+
+  const btnDel = document.createElement('button');
+  btnDel.className = 'fe-btn del';
+  btnDel.title = 'Delete';
+  btnDel.textContent = '✕';
+  btnDel.onclick = e => { e.stopPropagation(); showDeleteModal(filename); };
+
+  actions.appendChild(btnRename);
+  actions.appendChild(btnDel);
+  el.appendChild(nameEl);
+  el.appendChild(actions);
+  return el;
+}
+
+/* ── Name input modal (shared by New file and Rename) ── */
+let _libNameMode   = 'new';   /* 'new' | 'rename' */
+let _libNameTarget = null;    /* original filename when renaming */
+
+function showNewFileModal() {
+  _libNameMode   = 'new';
+  _libNameTarget = null;
+  document.getElementById('libname-title').textContent    = 'New file';
+  document.getElementById('libname-input').value          = '';
+  document.getElementById('libname-error').textContent    = '';
+  document.getElementById('libname-overlay').classList.add('show');
+  setTimeout(() => document.getElementById('libname-input').focus(), 150);
+}
+
+function showRenameModal(filename) {
+  _libNameMode   = 'rename';
+  _libNameTarget = filename;
+  document.getElementById('libname-title').textContent    = 'Rename file';
+  document.getElementById('libname-input').value          = filename.replace(/\.wsheet$/i, '');
+  document.getElementById('libname-error').textContent    = '';
+  document.getElementById('libname-overlay').classList.add('show');
+  setTimeout(() => {
+    const inp = document.getElementById('libname-input');
+    inp.focus(); inp.select();
+  }, 150);
+}
+
+function hideLibNameModal() {
+  document.getElementById('libname-overlay').classList.remove('show');
+}
+
+async function submitLibName() {
+  const raw  = document.getElementById('libname-input').value.trim();
+  const errEl = document.getElementById('libname-error');
+  if (!raw) { errEl.textContent = 'Enter a file name.'; return; }
+  const filename = raw.replace(/\.wsheet$/i, '') + '.wsheet';
+
+  if (_libNameMode === 'rename' && filename === _libNameTarget) { hideLibNameModal(); return; }
+
+  const btn = document.getElementById('btn-libname-ok');
+  btn.disabled = true;
+  errEl.textContent = '';
+  try {
+    if (_libNameMode === 'new') {
+      /* Use template.wsheet as initial content, fallback to empty wsheet */
+      let content;
+      try {
+        const tr = await fetch('./data/template.wsheet');
+        content = tr.ok ? await tr.text() : null;
+      } catch { content = null; }
+      if (!content) content = JSON.stringify({ version:1, data: Array.from({length:50}, () => Array(50).fill('')), formats:{}, borders:{} });
+      const blob = new Blob([content], { type: 'application/json;charset=utf-8' });
+      await storage.ref(`${STORAGE_FOLDER}/${filename}`).put(blob, { contentType: 'application/json' });
+      /* Open the newly created file immediately */
+      await loadWSheetText(content, filename);
+      currentCloudFile = filename;
+      showToast(`Created and opened: ${filename}`);
+    } else {
+      /* Rename = download old + upload new + delete old */
+      const url  = await storage.ref(`${STORAGE_FOLDER}/${_libNameTarget}`).getDownloadURL();
+      const resp = await fetch(url);
+      const blob = await resp.blob();
+      await storage.ref(`${STORAGE_FOLDER}/${filename}`).put(blob, { contentType: 'application/json' });
+      await storage.ref(`${STORAGE_FOLDER}/${_libNameTarget}`).delete();
+      /* Update state if renamed file was the open one */
+      if (currentCloudFile === _libNameTarget) currentCloudFile = filename;
+      showToast(`Renamed to: ${filename}`);
+    }
+    hideLibNameModal();
+    await loadFirebaseLibrary();
+    /* Highlight the file in the list (new or renamed) */
+    for (const el of fileListEl.querySelectorAll('.file-entry')) {
+      if (el.dataset.filename === filename) {
+        if (activeEntry) activeEntry.classList.remove('active');
+        activeEntry = el;
+        el.classList.add('active');
+        break;
+      }
+    }
+  } catch (err) {
+    errEl.textContent = 'Error: ' + err.message;
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+document.getElementById('libname-input').addEventListener('keydown', e => {
+  if (e.key === 'Enter') submitLibName();
+  if (e.key === 'Escape') hideLibNameModal();
+});
+document.getElementById('libname-overlay').addEventListener('click', e => {
+  if (e.target === document.getElementById('libname-overlay')) hideLibNameModal();
+});
+
+/* ── Delete confirm modal ── */
+let _libDelTarget = null;
+
+function showDeleteModal(filename) {
+  _libDelTarget = filename;
+  document.getElementById('libdel-msg').textContent =
+    `Are you sure you want to delete "${filename.replace(/\.wsheet$/i, '')}"?`;
+  document.getElementById('libdel-overlay').classList.add('show');
+}
+
+function hideLibDelModal() {
+  document.getElementById('libdel-overlay').classList.remove('show');
+}
+
+async function submitLibDel() {
+  if (!_libDelTarget) return;
+  const btn = document.getElementById('btn-libdel-ok');
+  btn.disabled = true;
+  try {
+    await storage.ref(`${STORAGE_FOLDER}/${_libDelTarget}`).delete();
+    if (currentCloudFile === _libDelTarget) currentCloudFile = null;
+    showToast(`Deleted: ${_libDelTarget}`);
+    hideLibDelModal();
+    loadFirebaseLibrary();
+  } catch (err) {
+    showToast('Delete failed: ' + err.message);
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+document.getElementById('libdel-overlay').addEventListener('click', e => {
+  if (e.target === document.getElementById('libdel-overlay')) hideLibDelModal();
+});
 </script>
 </body>
 </html>

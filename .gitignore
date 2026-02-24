@@ -1,0 +1,5 @@
+# Chiavi Firebase — NON committare mai questo file
+editor/firebase-config.js
+
+# macOS
+.DS_Store
