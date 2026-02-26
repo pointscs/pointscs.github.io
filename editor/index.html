@@ -270,14 +270,42 @@
     #btn-libdel-ok:hover { background: #b71c1c !important; }
 
     /* Handsontable tweaks */
+    /* Remove HOT's default grey right/bottom cell borders — box-shadow in
+       afterRenderer handles all visual grid lines and custom borders.
+       border-collapse:collapse is left intact so HOT's hit-testing is correct. */
     .handsontable .htCore td {
+      border-right:  none !important;
+      border-bottom: none !important;
+      padding: 0 !important;
       vertical-align: middle;
-      font-size: 16px;        /* default size */
-      text-align: center;     /* default alignment */
+      text-align: center;
       white-space: nowrap;
       overflow: visible;
     }
     .handsontable .htCore th { background: #f1f3f4; color: #555; font-weight: 600; }
+
+    /* ── Border popup (Ctrl/Cmd hover) ───────────────────── */
+    #border-popup {
+      position: fixed;
+      display: none;
+      flex-direction: row;
+      gap: 2px;
+      background: #fff;
+      border: 1px solid #ccc;
+      border-radius: 5px;
+      box-shadow: 0 3px 10px rgba(0,0,0,.18);
+      padding: 4px;
+      z-index: 9999;
+    }
+    #border-popup button {
+      width: 30px; height: 30px;
+      border: none; border-radius: 3px;
+      background: transparent;
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+    }
+    #border-popup button:hover { background: #f1f3f4; }
+    #border-popup button.active .bord-ico { outline: 2px solid #1a73e8; outline-offset: 1px; }
 
     /* ── Border-icon buttons ──────────────────────────────── */
     /* Small box with one thick side to show which border is set */
@@ -470,17 +498,13 @@
 
   <div class="tb-sep"></div>
 
-  <!-- Clear format -->
-  <button class="tb-btn" id="btn-clear-fmt" title="Clear formatting">&#10006; Fmt</button>
-
-  <div class="tb-sep"></div>
-
-  <!-- Cell borders -->
-  <button class="tb-btn" id="btn-bord-t" title="Top border">   <span class="bord-ico t"></span></button>
-  <button class="tb-btn" id="btn-bord-l" title="Left border">  <span class="bord-ico l"></span></button>
-  <button class="tb-btn" id="btn-bord-b" title="Bottom border"><span class="bord-ico b"></span></button>
-  <button class="tb-btn" id="btn-bord-r" title="Right border"> <span class="bord-ico r"></span></button>
-  <button class="tb-btn" id="btn-bord-a" title="All borders">  <span class="bord-ico a"></span></button>
+  <!-- Cell borders + clear borders -->
+  <button class="tb-btn" id="btn-bord-l" title="Left border">       <span class="bord-ico l"></span></button>
+  <button class="tb-btn" id="btn-bord-r" title="Right border">      <span class="bord-ico r"></span></button>
+  <button class="tb-btn" id="btn-bord-t" title="Top border">        <span class="bord-ico t"></span></button>
+  <button class="tb-btn" id="btn-bord-b" title="Bottom border">     <span class="bord-ico b"></span></button>
+  <button class="tb-btn" id="btn-bord-a" title="All borders">       <span class="bord-ico a"></span></button>
+  <button class="tb-btn" id="btn-clear-fmt" title="Clear formatting"><span class="bord-ico"></span></button>
 
   <div class="tb-sep"></div>
 
@@ -593,6 +617,16 @@
   </div>
 </div>
 
+<!-- ── Border popup (Ctrl/Cmd + click on cell) ──────────────────────────── -->
+<div id="border-popup">
+  <button data-side="left"   title="Left border"   onclick="toggleBorder('left')">  <span class="bord-ico l"></span></button>
+  <button data-side="right"  title="Right border"  onclick="toggleBorder('right')"> <span class="bord-ico r"></span></button>
+  <button data-side="top"    title="Top border"    onclick="toggleBorder('top')">   <span class="bord-ico t"></span></button>
+  <button data-side="bottom" title="Bottom border" onclick="toggleBorder('bottom')"><span class="bord-ico b"></span></button>
+  <button id="bp-outer"      title="All borders"   onclick="document.getElementById('btn-bord-a').click()"><span class="bord-ico a"></span></button>
+  <button id="bp-clear-fmt"  title="Clear formatting" onclick="document.getElementById('btn-clear-fmt').click()"><span class="bord-ico"></span></button>
+</div>
+
 <script>
 'use strict';
 
@@ -667,8 +701,10 @@ function showToast(msg, ms = 2800) {
 ═══════════════════════════════════════════════════════════ */
 const cellBorders = {};
 
-/* Declared here so afterRenderer can access it during initial render */
-let gridVisible = true;
+/* Declared here so afterRenderer can access them during initial render */
+let gridVisible  = true;
+let cellSize     = 36;
+let baseFontSize = 16; /* scales with cellSize */
 
 /* ═══════════════════════════════════════════════════════════
    HANDSONTABLE
@@ -739,7 +775,9 @@ const hot = new Handsontable(document.getElementById('sheet'), {
   wordWrap: false,
 
   afterRenderer(TD, row, col) {
+    /* Always set font size: cell-specific override, else current grid size */
     const fmt = cellFormats[row]?.[col];
+    TD.style.fontSize = (fmt?.fontSize ? fmt.fontSize + 'px' : baseFontSize + 'px');
     if (fmt) {
       TD.style.fontWeight = fmt.bold   ? 'bold'   : '';
       TD.style.fontStyle  = fmt.italic ? 'italic' : '';
@@ -749,45 +787,26 @@ const hot = new Handsontable(document.getElementById('sheet'), {
       TD.style.textDecoration  = dec.join(' ') || '';
       TD.style.color           = fmt.color      || '';
       TD.style.backgroundColor = (fmt.bgColor && fmt.bgColor !== '#ffffff') ? fmt.bgColor : '';
-      TD.style.fontSize        = fmt.fontSize   ? fmt.fontSize + 'px' : '';
       TD.style.fontFamily      = fmt.fontFamily || '';
       TD.style.textAlign       = fmt.align      || '';
     }
 
-    /* ── Borders (virtual rendering — only visible cells) ──────────────────
-       We must set style+width+color together: color/width alone won't draw
-       a border if borderStyle is still 'none' (HoT only sets right/bottom
-       as default grid lines; top/left have no CSS border at all).
-       We also mirror borders from neighboring cells: if the cell above has
-       a bottom border, this cell inherits a top border (and so on for all
-       four sides). This prevents white gaps at shared edges regardless of
-       whether the table uses border-collapse:collapse or separate.        */
-    const b      = cellBorders[row]?.[col] || {};
-    const hidden = !gridVisible;
-    const bOn = [
-      b.top    || !!(cellBorders[row - 1]?.[col]?.bottom),
-      b.right  || !!(cellBorders[row]?.[col + 1]?.left),
-      b.bottom || !!(cellBorders[row + 1]?.[col]?.top),
-      b.left   || !!(cellBorders[row]?.[col - 1]?.right),
-    ];
-    const bSides = ['Top', 'Right', 'Bottom', 'Left'];
-    for (let _i = 0; _i < 4; _i++) {
-      const S  = bSides[_i];
-      const on = bOn[_i];
-      if (on) {
-        TD.style['border' + S + 'Style'] = 'solid';
-        TD.style['border' + S + 'Width'] = '1px';
-        TD.style['border' + S + 'Color'] = '#000000';
-      } else if (hidden) {
-        TD.style['border' + S + 'Style'] = 'solid';
-        TD.style['border' + S + 'Width'] = '1px';
-        TD.style['border' + S + 'Color'] = 'transparent';
-      } else {
-        TD.style['border' + S + 'Style'] = '';
-        TD.style['border' + S + 'Width'] = '';
-        TD.style['border' + S + 'Color'] = '';
-      }
+    /* ── Borders via box-shadow (inset) ────────────────────────────────────
+       HOT's default border-right/bottom are removed via CSS (border-collapse
+       collapse is preserved for correct hit-testing).  With 0-width CSS
+       borders, cells are effectively pixel-adjacent, so inset box-shadows
+       drawn at each cell's edge produce a gap-free continuous line.         */
+    const b  = cellBorders[row]?.[col] || {};
+    const sh = [];
+    if (b.top)    sh.push('inset 0 1px 0 0 #000');
+    if (b.right)  sh.push('inset -1px 0 0 0 #000');
+    if (b.bottom) sh.push('inset 0 -1px 0 0 #000');
+    if (b.left)   sh.push('inset 1px 0 0 0 #000');
+    if (gridVisible) {
+      if (!b.right)  sh.push('inset -1px 0 0 0 #e0e0e0');
+      if (!b.bottom) sh.push('inset 0 -1px 0 0 #e0e0e0');
     }
+    TD.style.boxShadow = sh.join(', ') || '';
   },
 
   afterSelection(r, c) {
@@ -845,7 +864,7 @@ function syncToolbar(row, col) {
 
   document.getElementById('inp-color').value = fmt.color      || '#000000';
   document.getElementById('inp-bg').value    = fmt.bgColor    || '#ffffff';
-  document.getElementById('sel-size').value  = fmt.fontSize   || 16; /* CSS default is 16 */
+  document.getElementById('sel-size').value  = fmt.fontSize   || baseFontSize;
   document.getElementById('sel-font').value  = fmt.fontFamily || 'Arial';
 
   /* Border buttons reflect anchor cell's current state */
@@ -854,6 +873,13 @@ function syncToolbar(row, col) {
   document.getElementById('btn-bord-r').classList.toggle('active', !!bfmt.right);
   document.getElementById('btn-bord-b').classList.toggle('active', !!bfmt.bottom);
   document.getElementById('btn-bord-l').classList.toggle('active', !!bfmt.left);
+  /* Keep border popup in sync when visible */
+  const _bp = document.getElementById('border-popup');
+  if (_bp && _bp.style.display === 'flex') {
+    _bp.querySelectorAll('[data-side]').forEach(btn => {
+      btn.classList.toggle('active', !!bfmt[btn.dataset.side]);
+    });
+  }
 }
 
 /* ═══════════════════════════════════════════════════════════
@@ -1045,38 +1071,31 @@ function getRowH(row) {
   return 50;
 }
 
-/* Build SVG markup for the given cell range. Returns { svg, totalW, totalH }. */
+/* Build SVG markup for the given cell range. Returns { svg, totalW, totalH }.
+   Each cell is rendered as a square (cellSize × cellSize) so the grid is
+   always uniform. Text is NOT clipped — it can overflow into empty neighbours
+   just like a real spreadsheet. Background is always solid white.           */
 function buildSvg(rMin, rMax, cMin, cMax) {
-  const PAD     = 5;
-  const CBORD_W = 1.5;
+  const CS      = cellSize;           /* square cell side */
+  const PAD     = Math.round(CS * 0.12); /* horizontal text padding ≈ 12 % */
+  const CBORD_W = 1;
   const CBORD_C = '#000000';
 
-  const colWidths  = Array.from({ length: cMax - cMin + 1 }, (_, i) => getColW(cMin + i));
-  const rowHeights = Array.from({ length: rMax - rMin + 1 }, (_, i) => getRowH(rMin + i));
-  const totalW = colWidths.reduce((a, b) => a + b, 0);
-  const totalH = rowHeights.reduce((a, b) => a + b, 0);
+  const cols   = cMax - cMin + 1;
+  const rows   = rMax - rMin + 1;
+  const totalW = cols * CS;
+  const totalH = rows * CS;
 
-  let defs = '<defs>';
-  let body = '';
+  /* White background + body content */
+  let body = `<rect width="${totalW}" height="${totalH}" fill="#ffffff"/>`;
   let yOff = 0;
 
   for (let r = rMin; r <= rMax; r++) {
-    const rh = rowHeights[r - rMin];
     let xOff = 0;
-
     for (let c = cMin; c <= cMax; c++) {
-      const cw  = colWidths[c - cMin];
-      const uid = `cp_${r}_${c}`;
-
-      defs +=
-        `<clipPath id="${uid}">` +
-        `<rect x="${xOff + PAD}" y="${yOff + 1}" ` +
-        `width="${Math.max(0, cw - PAD * 2)}" height="${rh - 2}"/>` +
-        `</clipPath>`;
-
       const fmt = cellFormats[r]?.[c] || {};
       const fg  = fmt.color      || '#222222';
-      const fs  = fmt.fontSize   || 16;
+      const fs  = fmt.fontSize   || baseFontSize;
       const ff  = fmt.fontFamily || 'Arial';
       const fw  = fmt.bold       ? 'bold'   : 'normal';
       const fi  = fmt.italic     ? 'italic' : 'normal';
@@ -1084,43 +1103,48 @@ function buildSvg(rMin, rMax, cMin, cMax) {
       if (fmt.underline) decParts.push('underline');
       if (fmt.strike)    decParts.push('line-through');
       const deco = decParts.join(' ') || 'none';
+      const align = fmt.align || 'center';
 
+      /* Cell background */
       if (fmt.bgColor && fmt.bgColor !== '#ffffff') {
-        body +=
-          `<rect x="${xOff}" y="${yOff}" width="${cw}" height="${rh}" ` +
-          `fill="${fmt.bgColor}"/>`;
+        body += `<rect x="${xOff}" y="${yOff}" width="${CS}" height="${CS}" fill="${fmt.bgColor}"/>`;
       }
 
+      /* Text — no clip-path so content is never truncated */
       const val = hot.getDataAtCell(r, c);
       if (val !== null && val !== undefined && val !== '') {
+        const tx = align === 'left'  ? xOff + PAD
+                 : align === 'right' ? xOff + CS - PAD
+                 : xOff + CS / 2;
+        const anchor = align === 'left' ? 'start' : align === 'right' ? 'end' : 'middle';
         body +=
-          `<text x="${xOff + cw / 2}" y="${yOff + rh / 2}" ` +
+          `<text x="${tx}" y="${yOff + CS / 2}" ` +
           `font-family="${escapeXml(ff)}, sans-serif" ` +
           `font-size="${fs}" font-weight="${fw}" font-style="${fi}" ` +
           `text-decoration="${deco}" fill="${fg}" ` +
-          `text-anchor="middle" dominant-baseline="middle" ` +
-          `clip-path="url(#${uid})">${escapeXml(String(val))}</text>`;
+          `text-anchor="${anchor}" dominant-baseline="middle"` +
+          `>${escapeXml(String(val))}</text>`;
       }
 
+      /* Custom borders */
       const b  = cellBorders[r]?.[c] || {};
       const bl = `stroke="${CBORD_C}" stroke-width="${CBORD_W}" stroke-linecap="square"`;
-      if (b.top)    body += `<line x1="${xOff}"    y1="${yOff}"    x2="${xOff+cw}" y2="${yOff}"    ${bl}/>`;
-      if (b.bottom) body += `<line x1="${xOff}"    y1="${yOff+rh}" x2="${xOff+cw}" y2="${yOff+rh}" ${bl}/>`;
-      if (b.left)   body += `<line x1="${xOff}"    y1="${yOff}"    x2="${xOff}"    y2="${yOff+rh}" ${bl}/>`;
-      if (b.right)  body += `<line x1="${xOff+cw}" y1="${yOff}"    x2="${xOff+cw}" y2="${yOff+rh}" ${bl}/>`;
+      if (b.top)    body += `<line x1="${xOff}"      y1="${yOff}"      x2="${xOff+CS}" y2="${yOff}"      ${bl}/>`;
+      if (b.bottom) body += `<line x1="${xOff}"      y1="${yOff+CS}"   x2="${xOff+CS}" y2="${yOff+CS}"   ${bl}/>`;
+      if (b.left)   body += `<line x1="${xOff}"      y1="${yOff}"      x2="${xOff}"    y2="${yOff+CS}"   ${bl}/>`;
+      if (b.right)  body += `<line x1="${xOff+CS}"   y1="${yOff}"      x2="${xOff+CS}" y2="${yOff+CS}"   ${bl}/>`;
 
-      xOff += cw;
+      xOff += CS;
     }
-    yOff += rh;
+    yOff += CS;
   }
 
-  defs += '</defs>';
   const svg =
     `<?xml version="1.0" encoding="UTF-8"?>\n` +
     `<svg xmlns="http://www.w3.org/2000/svg" ` +
     `width="${totalW}" height="${totalH}" ` +
     `viewBox="0 0 ${totalW} ${totalH}">\n` +
-    `  ${defs}\n  ${body}\n</svg>`;
+    `  ${body}\n</svg>`;
 
   return { svg, totalW, totalH };
 }
@@ -1248,6 +1272,60 @@ document.getElementById('btn-bord-a').onclick = () => {
 };
 
 /* ═══════════════════════════════════════════════════════════
+   BORDER POPUP  (Ctrl/Cmd + click on any cell)
+═══════════════════════════════════════════════════════════ */
+const _borderPopup = document.getElementById('border-popup');
+
+function _syncBorderPopup() {
+  const sel = hot.getSelected();
+  if (!sel || !sel.length) return;
+  const [r, c] = sel[0];
+  const bfmt = cellBorders[r]?.[c] || {};
+  _borderPopup.querySelectorAll('[data-side]').forEach(btn => {
+    btn.classList.toggle('active', !!bfmt[btn.dataset.side]);
+  });
+}
+
+function _showBorderPopup(x, y) {
+  _syncBorderPopup();
+  _borderPopup.style.display = 'flex';
+  const pw = _borderPopup.offsetWidth || 168;
+  const left = Math.min(x + 4, window.innerWidth - pw - 8);
+  const top  = Math.min(y + 4, window.innerHeight - 50);
+  _borderPopup.style.left = left + 'px';
+  _borderPopup.style.top  = top  + 'px';
+}
+
+/* Track mouse position over the sheet for Ctrl/Cmd popup */
+let _sheetMouseTarget = null;
+let _sheetMousePos    = { x: 0, y: 0 };
+const _sheetEl = document.getElementById('sheet');
+_sheetEl.addEventListener('mousemove', e => {
+  _sheetMouseTarget = e.target;
+  _sheetMousePos    = { x: e.clientX, y: e.clientY };
+});
+_sheetEl.addEventListener('mouseleave', () => { _sheetMouseTarget = null; });
+
+/* Show popup when Ctrl/Cmd is pressed while hovering a data cell */
+document.addEventListener('keydown', e => {
+  if ((e.key === 'Control' || e.key === 'Meta') && _sheetMouseTarget?.closest('td')) {
+    _showBorderPopup(_sheetMousePos.x, _sheetMousePos.y);
+  }
+});
+
+/* Hide popup when Ctrl/Cmd is released */
+document.addEventListener('keyup', e => {
+  if (e.key === 'Control' || e.key === 'Meta') {
+    _borderPopup.style.display = 'none';
+  }
+});
+
+/* Also hide popup when clicking anywhere outside it */
+document.addEventListener('mousedown', e => {
+  if (!_borderPopup.contains(e.target)) _borderPopup.style.display = 'none';
+});
+
+/* ═══════════════════════════════════════════════════════════
    GRID TOGGLE + SIZE
    (gridVisible is declared above, before Handsontable initialization)
 ═══════════════════════════════════════════════════════════ */
@@ -1257,13 +1335,14 @@ document.getElementById('btn-grid').onclick = () => {
   hot.render();
 };
 
-let cellSize = 36;
 document.getElementById('btn-grid-minus').onclick = () => {
-  cellSize = Math.max(16, cellSize - 6);
+  cellSize     = Math.max(16, cellSize - 6);
+  baseFontSize = Math.round(cellSize * 16 / 36);
   hot.updateSettings({ colWidths: cellSize, rowHeights: cellSize });
 };
 document.getElementById('btn-grid-plus').onclick = () => {
-  cellSize = Math.min(150, cellSize + 6);
+  cellSize     = Math.min(150, cellSize + 6);
+  baseFontSize = Math.round(cellSize * 16 / 36);
   hot.updateSettings({ colWidths: cellSize, rowHeights: cellSize });
 };
 
