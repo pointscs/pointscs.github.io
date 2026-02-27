@@ -135,37 +135,6 @@
     #btn-svg:hover, #btn-png:hover { background: #1558b0; }
 
     /* ── Formula bar ──────────────────────────────────────── */
-    #formula-bar {
-      background: #fff;
-      border-bottom: 1px solid #e0e0e0;
-      padding: 3px 10px;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      flex-shrink: 0;
-      height: 32px;
-    }
-    #cell-addr {
-      width: 58px;
-      padding: 2px 6px;
-      border: 1px solid #ccc;
-      border-radius: 2px;
-      font-size: 12px;
-      text-align: center;
-      background: #fafafa;
-    }
-    #cell-addr:focus { outline: none; border-color: #4285f4; background: #fff; }
-    #fx-label { color: #aaa; font-style: italic; font-size: 15px; flex-shrink: 0; }
-    #formula-in {
-      flex: 1;
-      padding: 2px 6px;
-      border: 1px solid transparent;
-      border-radius: 2px;
-      font-size: 13px;
-      background: transparent;
-    }
-    #formula-in:focus { outline: none; border-color: #4285f4; background: #fff; }
-
     /* ── Spreadsheet area ──────────────────────────────────── */
     #main-area   { flex: 1; display: flex; overflow: hidden; }
     #sheet-wrap  { flex: 1; overflow: hidden; position: relative; }
@@ -456,17 +425,6 @@
 <!-- ── Toolbar ──────────────────────────────────────────────────────────── -->
 <div id="toolbar">
 
-  <!-- Font family -->
-  <select class="tb-select" id="sel-font" style="width:114px;" title="Font">
-    <option value="Arial">Arial</option>
-    <option value="Verdana">Verdana</option>
-    <option value="Georgia">Georgia</option>
-    <option value="Trebuchet MS">Trebuchet MS</option>
-    <option value="Courier New">Courier New</option>
-    <option value="Times New Roman">Times New Roman</option>
-    <option value="Impact">Impact</option>
-  </select>
-
   <!-- Font size -->
   <select class="tb-select" id="sel-size" style="width:54px;" title="Dimensione">
     <option>8</option><option>9</option><option>10</option><option>11</option>
@@ -475,16 +433,6 @@
     <option>24</option><option>28</option><option>32</option><option>36</option>
     <option>48</option><option>72</option>
   </select>
-
-  <div class="tb-sep"></div>
-
-  <!-- Style buttons -->
-  <button class="tb-btn" id="btn-bold"      title="Bold (Ctrl+B)"><b>B</b></button>
-  <button class="tb-btn" id="btn-italic"    title="Italic (Ctrl+I)"><i>I</i></button>
-  <button class="tb-btn" id="btn-underline" title="Underline (Ctrl+U)"><u>U</u></button>
-  <button class="tb-btn" id="btn-strike"    title="Strikethrough"><s>S</s></button>
-
-  <div class="tb-sep"></div>
 
   <!-- Color pickers -->
   <div class="color-wrap" title="Text color">
@@ -537,12 +485,6 @@
 </div>
 
 <!-- ── Formula bar ──────────────────────────────────────────────────────── -->
-<div id="formula-bar">
-  <input type="text" id="cell-addr" value="A1" readonly>
-  <span id="fx-label">ƒx</span>
-  <input type="text" id="formula-in" placeholder="Value...">
-</div>
-
 <!-- ── Spreadsheet + File panel ─────────────────────────────────────────── -->
 <div id="main-area">
   <div id="sheet-wrap">
@@ -646,6 +588,7 @@ function getFmt(row, col) {
 function applyFmt(props) {
   const sel = hot.getSelected();
   if (!sel) return;
+  pushUndo(_snapshotCells(_selCells(sel)));
   for (const [r1, c1, r2, c2] of sel) {
     const rMin = Math.min(r1, r2), rMax = Math.max(r1, r2);
     const cMin = Math.min(c1, c2), cMax = Math.max(c1, c2);
@@ -707,6 +650,57 @@ let cellSize     = 36;
 let baseFontSize = 16; /* scales with cellSize */
 
 /* ═══════════════════════════════════════════════════════════
+   UNDO STACK
+   Each entry: array of { r, c, value, fmt, border }
+   capturing the "before" state of affected cells.
+═══════════════════════════════════════════════════════════ */
+const undoStack = [];
+const UNDO_LIMIT = 100;
+let _undoing = false;
+
+function _snapshotCells(cells) {
+  return cells.map(([r, c]) => ({
+    r, c,
+    value:  hot.getDataAtCell(r, c),
+    fmt:    cellFormats[r]?.[c] ? { ...cellFormats[r][c] } : null,
+    border: cellBorders[r]?.[c] ? { ...cellBorders[r][c] } : null,
+  }));
+}
+
+function _selCells(sel) {
+  const out = [];
+  for (const [r1, c1, r2, c2] of sel)
+    for (let r = Math.min(r1, r2); r <= Math.max(r1, r2); r++)
+      for (let c = Math.min(c1, c2); c <= Math.max(c1, c2); c++)
+        out.push([r, c]);
+  return out;
+}
+
+function pushUndo(snapshot) {
+  if (_undoing) return;
+  undoStack.push(snapshot);
+  if (undoStack.length > UNDO_LIMIT) undoStack.shift();
+}
+
+function performUndo() {
+  if (!undoStack.length) return;
+  _undoing = true;
+  const snapshot = undoStack.pop();
+  const changes = snapshot.map(({ r, c, value }) => [r, c, value ?? null]);
+  for (const { r, c, fmt, border } of snapshot) {
+    if (fmt)    { if (!cellFormats[r]) cellFormats[r] = {}; cellFormats[r][c] = { ...fmt }; }
+    else        { if (cellFormats[r]) delete cellFormats[r][c]; }
+    if (border) { if (!cellBorders[r]) cellBorders[r] = {}; cellBorders[r][c] = { ...border }; }
+    else        { if (cellBorders[r]) delete cellBorders[r][c]; }
+  }
+  hot.setDataAtCell(changes);
+  hot.render();
+  _undoing = false;
+  const s = hot.getSelected();
+  if (s && s.length) syncToolbar(s[0][0], s[0][1]);
+}
+
+/* ═══════════════════════════════════════════════════════════
    HANDSONTABLE
 ═══════════════════════════════════════════════════════════ */
 const hot = new Handsontable(document.getElementById('sheet'), {
@@ -725,13 +719,15 @@ const hot = new Handsontable(document.getElementById('sheet'), {
           copyToClipboard(); /* sets internalClipboard synchronously */
           const s = hot.getSelected();
           if (!s) return;
-          const changes = [];
-          for (const [r1, c1, r2, c2] of s) {
-            for (let r = Math.min(r1, r2); r <= Math.max(r1, r2); r++)
-              for (let c = Math.min(c1, c2); c <= Math.max(c1, c2); c++)
-                changes.push([r, c, null]);
-          }
+          const cells = _selCells(s);
+          pushUndo(_snapshotCells(cells));
+          const changes = cells.map(([r, c]) => {
+            if (cellFormats[r]) delete cellFormats[r][c];
+            if (cellBorders[r]) delete cellBorders[r][c];
+            return [r, c, null];
+          });
           hot.setDataAtCell(changes);
+          hot.render();
         },
       },
       paste: {
@@ -775,21 +771,19 @@ const hot = new Handsontable(document.getElementById('sheet'), {
   wordWrap: false,
 
   afterRenderer(TD, row, col) {
-    /* Always set font size: cell-specific override, else current grid size */
+    /* Always reset all inline styles so stale styles from DOM recycling don't persist */
     const fmt = cellFormats[row]?.[col];
-    TD.style.fontSize = (fmt?.fontSize ? fmt.fontSize + 'px' : baseFontSize + 'px');
-    if (fmt) {
-      TD.style.fontWeight = fmt.bold   ? 'bold'   : '';
-      TD.style.fontStyle  = fmt.italic ? 'italic' : '';
-      const dec = [];
-      if (fmt.underline) dec.push('underline');
-      if (fmt.strike)    dec.push('line-through');
-      TD.style.textDecoration  = dec.join(' ') || '';
-      TD.style.color           = fmt.color      || '';
-      TD.style.backgroundColor = (fmt.bgColor && fmt.bgColor !== '#ffffff') ? fmt.bgColor : '';
-      TD.style.fontFamily      = fmt.fontFamily || '';
-      TD.style.textAlign       = fmt.align      || '';
-    }
+    TD.style.fontSize        = fmt?.fontSize ? fmt.fontSize + 'px' : baseFontSize + 'px';
+    TD.style.fontWeight      = fmt?.bold      ? 'bold'   : '';
+    TD.style.fontStyle       = fmt?.italic    ? 'italic' : '';
+    const dec = [];
+    if (fmt?.underline) dec.push('underline');
+    if (fmt?.strike)    dec.push('line-through');
+    TD.style.textDecoration  = dec.join(' ') || '';
+    TD.style.color           = fmt?.color     || '';
+    TD.style.backgroundColor = (fmt?.bgColor && fmt.bgColor !== '#ffffff') ? fmt.bgColor : '';
+    TD.style.fontFamily      = fmt?.fontFamily || '';
+    TD.style.textAlign       = 'center';
 
     /* ── Borders via box-shadow (inset) ────────────────────────────────────
        HOT's default border-right/bottom are removed via CSS (border-collapse
@@ -810,16 +804,18 @@ const hot = new Handsontable(document.getElementById('sheet'), {
   },
 
   afterSelection(r, c) {
-    updateFormulaBar(r, c);
     syncToolbar(r, c);
     updateStatus();
+  },
+
+  beforeChange(changes, source) {
+    if (_undoing || source !== 'edit') return;
+    pushUndo(_snapshotCells(changes.map(([r, c]) => [r, c])));
   },
 
   afterChange(changes) {
     if (!changes) return;
     _isDirty = true;
-    const s = hot.getSelected();
-    if (s && s.length) updateFormulaBar(s[0][0], s[0][1]);
     updateStatus();
   },
 });
@@ -827,45 +823,15 @@ const hot = new Handsontable(document.getElementById('sheet'), {
 /* ═══════════════════════════════════════════════════════════
    FORMULA BAR
 ═══════════════════════════════════════════════════════════ */
-const addrEl = document.getElementById('cell-addr');
-const fxEl   = document.getElementById('formula-in');
-
-function updateFormulaBar(row, col) {
-  addrEl.value = cellAddr(row, col);
-  const v = hot.getDataAtCell(row, col);
-  fxEl.value = (v == null) ? '' : String(v);
-}
-
-fxEl.addEventListener('keydown', (e) => {
-  if (e.key !== 'Enter' && e.key !== 'Tab') return;
-  e.preventDefault();
-  const s = hot.getSelected();
-  if (!s || !s.length) return;
-  const [r, c] = s[0];
-  hot.setDataAtCell(r, c, fxEl.value);
-  hot.selectCell(r, c);
-});
-fxEl.addEventListener('blur', () => {
-  const s = hot.getSelected();
-  if (!s || !s.length) return;
-  hot.setDataAtCell(s[0][0], s[0][1], fxEl.value);
-});
-
 /* ═══════════════════════════════════════════════════════════
    TOOLBAR STATE SYNC
 ═══════════════════════════════════════════════════════════ */
 function syncToolbar(row, col) {
   const fmt = cellFormats[row]?.[col] || {};
 
-  document.getElementById('btn-bold').classList.toggle('active',      !!fmt.bold);
-  document.getElementById('btn-italic').classList.toggle('active',    !!fmt.italic);
-  document.getElementById('btn-underline').classList.toggle('active', !!fmt.underline);
-  document.getElementById('btn-strike').classList.toggle('active',    !!fmt.strike);
-
+  document.getElementById('sel-size').value  = fmt.fontSize   || baseFontSize;
   document.getElementById('inp-color').value = fmt.color      || '#000000';
   document.getElementById('inp-bg').value    = fmt.bgColor    || '#ffffff';
-  document.getElementById('sel-size').value  = fmt.fontSize   || baseFontSize;
-  document.getElementById('sel-font').value  = fmt.fontFamily || 'Arial';
 
   /* Border buttons reflect anchor cell's current state */
   const bfmt = cellBorders[row]?.[col] || {};
@@ -907,12 +873,6 @@ function updateStatus() {
 /* ═══════════════════════════════════════════════════════════
    TOOLBAR WIRING
 ═══════════════════════════════════════════════════════════ */
-document.getElementById('btn-bold').onclick      = () => toggleFmt('bold');
-document.getElementById('btn-italic').onclick    = () => toggleFmt('italic');
-document.getElementById('btn-underline').onclick = () => toggleFmt('underline');
-document.getElementById('btn-strike').onclick    = () => toggleFmt('strike');
-
-document.getElementById('sel-font').onchange = (e) => applyFmt({ fontFamily: e.target.value });
 document.getElementById('sel-size').onchange = (e) => applyFmt({ fontSize: parseInt(e.target.value) });
 document.getElementById('inp-color').oninput  = (e) => applyFmt({ color: e.target.value });
 document.getElementById('inp-bg').oninput     = (e) => applyFmt({ bgColor: e.target.value });
@@ -920,6 +880,7 @@ document.getElementById('inp-bg').oninput     = (e) => applyFmt({ bgColor: e.tar
 document.getElementById('btn-clear-fmt').onclick = () => {
   const sel = hot.getSelected();
   if (!sel) return;
+  pushUndo(_snapshotCells(_selCells(sel)));
   for (const [r1, c1, r2, c2] of sel) {
     for (let r = Math.min(r1, r2); r <= Math.max(r1, r2); r++) {
       for (let c = Math.min(c1, c2); c <= Math.max(c1, c2); c++) {
@@ -998,6 +959,9 @@ async function pasteFromClipboard() {
 
   if (useInternal) {
     /* ── Full paste: values + formatting + borders ── */
+    const destCells = internalClipboard.grid.flatMap((row, ri) =>
+      row.map((_, ci) => [r0 + ri, c0 + ci]));
+    pushUndo(_snapshotCells(destCells));
     const changes = [];
     internalClipboard.grid.forEach((row, ri) => {
       row.forEach((cell, ci) => {
@@ -1022,6 +986,7 @@ async function pasteFromClipboard() {
     /* ── External paste: TSV only — formatting/borders untouched ── */
     const parsed = systemText.replace(/\r\n?/g, '\n').trimEnd()
       .split('\n').map(row => row.split('\t'));
+    pushUndo(_snapshotCells(parsed.flatMap((row, ri) => row.map((_, ci) => [r0 + ri, c0 + ci]))));
     hot.setDataAtCell(
       parsed.flatMap((row, ri) => row.map((v, ci) => [r0 + ri, c0 + ci, v]))
     );
@@ -1034,6 +999,7 @@ async function pasteFromClipboard() {
 document.addEventListener('keydown', async (e) => {
   if (!(e.ctrlKey || e.metaKey) || e.shiftKey || e.altKey) return;
 
+  if (e.key === 'z') { e.preventDefault(); performUndo();               return; }
   if (e.key === 'b') { e.preventDefault(); toggleFmt('bold');           return; }
   if (e.key === 'i') { e.preventDefault(); toggleFmt('italic');         return; }
   if (e.key === 'u') { e.preventDefault(); toggleFmt('underline');      return; }
@@ -1044,12 +1010,15 @@ document.addEventListener('keydown', async (e) => {
     await copyToClipboard();
     const s = hot.getSelected();
     if (!s) return;
-    const changes = [];
-    for (const [r1, c1, r2, c2] of s)
-      for (let r = Math.min(r1, r2); r <= Math.max(r1, r2); r++)
-        for (let c = Math.min(c1, c2); c <= Math.max(c1, c2); c++)
-          changes.push([r, c, null]);
+    const cells = _selCells(s);
+    pushUndo(_snapshotCells(cells));
+    const changes = cells.map(([r, c]) => {
+      if (cellFormats[r]) delete cellFormats[r][c];
+      if (cellBorders[r]) delete cellBorders[r][c];
+      return [r, c, null];
+    });
     hot.setDataAtCell(changes);
+    hot.render();
     return;
   }
 });
@@ -1222,6 +1191,7 @@ function applyBorderToCell(/* row, col — no-op, hot.render() called by caller 
 function toggleBorder(side) {
   const sel = hot.getSelected();
   if (!sel || !sel.length) return;
+  pushUndo(_snapshotCells(_selCells(sel)));
 
   const enable = !getBordFmt(sel[0][0], sel[0][1])[side];
 
@@ -1247,6 +1217,7 @@ document.getElementById('btn-bord-r').onclick = () => toggleBorder('right');
 document.getElementById('btn-bord-a').onclick = () => {
   const sel = hot.getSelected();
   if (!sel || !sel.length) return;
+  pushUndo(_snapshotCells(_selCells(sel)));
 
   /* Compute the overall bounding box across all selection areas */
   let rMin = Infinity, rMax = -Infinity, cMin = Infinity, cMax = -Infinity;
