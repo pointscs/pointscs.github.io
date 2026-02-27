@@ -434,6 +434,13 @@
     <option>48</option><option>72</option>
   </select>
 
+  <!-- Text alignment -->
+  <select class="tb-select" id="sel-align" style="width:72px;" title="Allineamento">
+    <option value="center" selected>Center</option>
+    <option value="left">Left</option>
+    <option value="right">Right</option>
+  </select>
+
   <!-- Color pickers -->
   <div class="color-wrap" title="Text color">
     <span class="color-label">A</span>
@@ -758,8 +765,8 @@ const hot = new Handsontable(document.getElementById('sheet'), {
       },
     },
   },
-  manualColumnResize: false,
-  manualRowResize: false,
+  manualColumnResize: true,
+  manualRowResize: true,
   selectionMode: 'multiple',
   outsideClickDeselects: false,
   width:  '100%',
@@ -782,8 +789,8 @@ const hot = new Handsontable(document.getElementById('sheet'), {
     TD.style.textDecoration  = dec.join(' ') || '';
     TD.style.color           = fmt?.color     || '';
     TD.style.backgroundColor = (fmt?.bgColor && fmt.bgColor !== '#ffffff') ? fmt.bgColor : '';
-    TD.style.fontFamily      = fmt?.fontFamily || '';
-    TD.style.textAlign       = 'center';
+    TD.style.fontFamily      = 'Arial';
+    TD.style.textAlign       = fmt?.align || 'center';
 
     /* ── Borders via box-shadow (inset) ────────────────────────────────────
        HOT's default border-right/bottom are removed via CSS (border-collapse
@@ -830,6 +837,7 @@ function syncToolbar(row, col) {
   const fmt = cellFormats[row]?.[col] || {};
 
   document.getElementById('sel-size').value  = fmt.fontSize   || baseFontSize;
+  document.getElementById('sel-align').value = fmt.align      || 'center';
   document.getElementById('inp-color').value = fmt.color      || '#000000';
   document.getElementById('inp-bg').value    = fmt.bgColor    || '#ffffff';
 
@@ -873,7 +881,8 @@ function updateStatus() {
 /* ═══════════════════════════════════════════════════════════
    TOOLBAR WIRING
 ═══════════════════════════════════════════════════════════ */
-document.getElementById('sel-size').onchange = (e) => applyFmt({ fontSize: parseInt(e.target.value) });
+document.getElementById('sel-size').onchange  = (e) => applyFmt({ fontSize: parseInt(e.target.value) });
+document.getElementById('sel-align').onchange = (e) => applyFmt({ align: e.target.value });
 document.getElementById('inp-color').oninput  = (e) => applyFmt({ color: e.target.value });
 document.getElementById('inp-bg').oninput     = (e) => applyFmt({ bgColor: e.target.value });
 
@@ -1065,7 +1074,7 @@ function buildSvg(rMin, rMax, cMin, cMax) {
       const fmt = cellFormats[r]?.[c] || {};
       const fg  = fmt.color      || '#222222';
       const fs  = fmt.fontSize   || baseFontSize;
-      const ff  = fmt.fontFamily || 'Arial';
+      const ff  = 'Arial';
       const fw  = fmt.bold       ? 'bold'   : 'normal';
       const fi  = fmt.italic     ? 'italic' : 'normal';
       const decParts = [];
