@@ -1038,66 +1038,81 @@ document.addEventListener('keydown', async (e) => {
 
 /* Get actual rendered column width */
 function getColW(col) {
-  try { const w = hot.getColWidth(col); return (w > 0) ? w : 50; }
-  catch { return 50; }
+  try { const w = hot.getColWidth(col); return (w > 0) ? w : cellSize; }
+  catch { return cellSize; }
 }
 
-/* Get actual rendered row height (from DOM if available, else fallback) */
+/* Get actual rendered row height */
 function getRowH(row) {
   const td = hot.getCell(row, 0);
-  if (td?.parentElement) return td.parentElement.offsetHeight || 50;
-  return 50;
+  if (td?.parentElement) return td.parentElement.offsetHeight || cellSize;
+  return cellSize;
 }
 
 /* Build SVG markup for the given cell range. Returns { svg, totalW, totalH }.
-   Each cell is rendered as a square (cellSize × cellSize) so the grid is
-   always uniform. Text is NOT clipped — it can overflow into empty neighbours
-   just like a real spreadsheet. Background is always solid white.           */
+   Uses actual column widths and row heights, and respects per-cell alignment. */
 function buildSvg(rMin, rMax, cMin, cMax) {
-  const CS      = cellSize;           /* square cell side */
-  const PAD     = Math.round(CS * 0.12); /* horizontal text padding ≈ 12 % */
   const CBORD_W = 1;
   const CBORD_C = '#000000';
 
-  const cols   = cMax - cMin + 1;
-  const rows   = rMax - rMin + 1;
-  const totalW = cols * CS;
-  const totalH = rows * CS;
+  /* Pre-compute actual sizes for each column and row in range */
+  const colWs = [];
+  for (let c = cMin; c <= cMax; c++) colWs.push(getColW(c));
+  const rowHs = [];
+  for (let r = rMin; r <= rMax; r++) rowHs.push(getRowH(r));
 
-  /* White background + body content */
+  /* Cumulative x/y offsets */
+  const xOffsets = [];
+  let xAcc = 0;
+  for (const w of colWs) { xOffsets.push(xAcc); xAcc += w; }
+  const totalW = xAcc;
+
+  const yOffsets = [];
+  let yAcc = 0;
+  for (const h of rowHs) { yOffsets.push(yAcc); yAcc += h; }
+  const totalH = yAcc;
+
   let body = `<rect width="${totalW}" height="${totalH}" fill="#ffffff"/>`;
-  let yOff = 0;
 
-  for (let r = rMin; r <= rMax; r++) {
-    let xOff = 0;
-    for (let c = cMin; c <= cMax; c++) {
+  for (let ri = 0; ri <= rMax - rMin; ri++) {
+    const r    = rMin + ri;
+    const yOff = yOffsets[ri];
+    const CH   = rowHs[ri];
+
+    for (let ci = 0; ci <= cMax - cMin; ci++) {
+      const c    = cMin + ci;
+      const xOff = xOffsets[ci];
+      const CW   = colWs[ci];
+
       const fmt = cellFormats[r]?.[c] || {};
-      const fg  = fmt.color      || '#222222';
-      const fs  = fmt.fontSize   || baseFontSize;
-      const ff  = 'Arial';
-      const fw  = fmt.bold       ? 'bold'   : 'normal';
-      const fi  = fmt.italic     ? 'italic' : 'normal';
+      const fg  = fmt.color    || '#222222';
+      const fs  = fmt.fontSize || baseFontSize;
+      const fw  = fmt.bold     ? 'bold'   : 'normal';
+      const fi  = fmt.italic   ? 'italic' : 'normal';
       const decParts = [];
       if (fmt.underline) decParts.push('underline');
       if (fmt.strike)    decParts.push('line-through');
-      const deco = decParts.join(' ') || 'none';
+      const deco  = decParts.join(' ') || 'none';
       const align = fmt.align || 'center';
+      const PAD   = Math.max(3, Math.round(CW * 0.08));
 
       /* Cell background */
       if (fmt.bgColor && fmt.bgColor !== '#ffffff') {
-        body += `<rect x="${xOff}" y="${yOff}" width="${CS}" height="${CS}" fill="${fmt.bgColor}"/>`;
+        body += `<rect x="${xOff}" y="${yOff}" width="${CW}" height="${CH}" fill="${fmt.bgColor}"/>`;
       }
 
-      /* Text — no clip-path so content is never truncated */
+      /* Text */
       const val = hot.getDataAtCell(r, c);
       if (val !== null && val !== undefined && val !== '') {
-        const tx = align === 'left'  ? xOff + PAD
-                 : align === 'right' ? xOff + CS - PAD
-                 : xOff + CS / 2;
-        const anchor = align === 'left' ? 'start' : align === 'right' ? 'end' : 'middle';
+        const tx     = align === 'left'  ? xOff + PAD
+                     : align === 'right' ? xOff + CW - PAD
+                     : xOff + CW / 2;
+        const anchor = align === 'left'  ? 'start'
+                     : align === 'right' ? 'end'
+                     : 'middle';
         body +=
-          `<text x="${tx}" y="${yOff + CS / 2}" ` +
-          `font-family="${escapeXml(ff)}, sans-serif" ` +
+          `<text x="${tx}" y="${yOff + CH / 2}" ` +
+          `font-family="Arial, sans-serif" ` +
           `font-size="${fs}" font-weight="${fw}" font-style="${fi}" ` +
           `text-decoration="${deco}" fill="${fg}" ` +
           `text-anchor="${anchor}" dominant-baseline="middle"` +
@@ -1107,14 +1122,11 @@ function buildSvg(rMin, rMax, cMin, cMax) {
       /* Custom borders */
       const b  = cellBorders[r]?.[c] || {};
       const bl = `stroke="${CBORD_C}" stroke-width="${CBORD_W}" stroke-linecap="square"`;
-      if (b.top)    body += `<line x1="${xOff}"      y1="${yOff}"      x2="${xOff+CS}" y2="${yOff}"      ${bl}/>`;
-      if (b.bottom) body += `<line x1="${xOff}"      y1="${yOff+CS}"   x2="${xOff+CS}" y2="${yOff+CS}"   ${bl}/>`;
-      if (b.left)   body += `<line x1="${xOff}"      y1="${yOff}"      x2="${xOff}"    y2="${yOff+CS}"   ${bl}/>`;
-      if (b.right)  body += `<line x1="${xOff+CS}"   y1="${yOff}"      x2="${xOff+CS}" y2="${yOff+CS}"   ${bl}/>`;
-
-      xOff += CS;
+      if (b.top)    body += `<line x1="${xOff}"      y1="${yOff}"      x2="${xOff+CW}" y2="${yOff}"      ${bl}/>`;
+      if (b.bottom) body += `<line x1="${xOff}"      y1="${yOff+CH}"   x2="${xOff+CW}" y2="${yOff+CH}"   ${bl}/>`;
+      if (b.left)   body += `<line x1="${xOff}"      y1="${yOff}"      x2="${xOff}"    y2="${yOff+CH}"   ${bl}/>`;
+      if (b.right)  body += `<line x1="${xOff+CW}"   y1="${yOff}"      x2="${xOff+CW}" y2="${yOff+CH}"   ${bl}/>`;
     }
-    yOff += CS;
   }
 
   const svg =
