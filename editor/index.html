@@ -454,6 +454,10 @@
   <div class="tb-sep"></div>
 
   <!-- Cell borders + clear borders -->
+  <div class="color-wrap" title="Border color" style="margin-right:2px;">
+    <span class="color-label" style="font-size:9px;">BD</span>
+    <input type="color" class="color-swatch" id="inp-bord-color" value="#000000">
+  </div>
   <button class="tb-btn" id="btn-bord-l" title="Left border">       <span class="bord-ico l"></span></button>
   <button class="tb-btn" id="btn-bord-r" title="Right border">      <span class="bord-ico r"></span></button>
   <button class="tb-btn" id="btn-bord-t" title="Top border">        <span class="bord-ico t"></span></button>
@@ -798,11 +802,12 @@ const hot = new Handsontable(document.getElementById('sheet'), {
        borders, cells are effectively pixel-adjacent, so inset box-shadows
        drawn at each cell's edge produce a gap-free continuous line.         */
     const b  = cellBorders[row]?.[col] || {};
+    const _bc = (v) => typeof v === 'string' ? v : '#000000';
     const sh = [];
-    if (b.top)    sh.push('inset 0 1px 0 0 #000');
-    if (b.right)  sh.push('inset -1px 0 0 0 #000');
-    if (b.bottom) sh.push('inset 0 -1px 0 0 #000');
-    if (b.left)   sh.push('inset 1px 0 0 0 #000');
+    if (b.top)    sh.push(`inset 0 1px 0 0 ${_bc(b.top)}`);
+    if (b.right)  sh.push(`inset -1px 0 0 0 ${_bc(b.right)}`);
+    if (b.bottom) sh.push(`inset 0 -1px 0 0 ${_bc(b.bottom)}`);
+    if (b.left)   sh.push(`inset 1px 0 0 0 ${_bc(b.left)}`);
     if (gridVisible) {
       if (!b.right)  sh.push('inset -1px 0 0 0 #e0e0e0');
       if (!b.bottom) sh.push('inset 0 -1px 0 0 #e0e0e0');
@@ -883,8 +888,11 @@ function updateStatus() {
 ═══════════════════════════════════════════════════════════ */
 document.getElementById('sel-size').onchange  = (e) => applyFmt({ fontSize: parseInt(e.target.value) });
 document.getElementById('sel-align').onchange = (e) => applyFmt({ align: e.target.value });
-document.getElementById('inp-color').oninput  = (e) => applyFmt({ color: e.target.value });
-document.getElementById('inp-bg').oninput     = (e) => applyFmt({ bgColor: e.target.value });
+document.getElementById('inp-color').oninput     = (e) => applyFmt({ color: e.target.value });
+document.getElementById('inp-bg').oninput        = (e) => applyFmt({ bgColor: e.target.value });
+
+let _bordColor = '#000000';
+document.getElementById('inp-bord-color').oninput = (e) => { _bordColor = e.target.value; };
 
 document.getElementById('btn-clear-fmt').onclick = () => {
   const sel = hot.getSelected();
@@ -1053,7 +1061,6 @@ function getRowH(row) {
    Uses actual column widths and row heights, and respects per-cell alignment. */
 function buildSvg(rMin, rMax, cMin, cMax) {
   const CBORD_W = 1;
-  const CBORD_C = '#000000';
 
   /* Pre-compute actual sizes for each column and row in range */
   const colWs = [];
@@ -1120,12 +1127,13 @@ function buildSvg(rMin, rMax, cMin, cMax) {
       }
 
       /* Custom borders */
-      const b  = cellBorders[r]?.[c] || {};
-      const bl = `stroke="${CBORD_C}" stroke-width="${CBORD_W}" stroke-linecap="square"`;
-      if (b.top)    body += `<line x1="${xOff}"      y1="${yOff}"      x2="${xOff+CW}" y2="${yOff}"      ${bl}/>`;
-      if (b.bottom) body += `<line x1="${xOff}"      y1="${yOff+CH}"   x2="${xOff+CW}" y2="${yOff+CH}"   ${bl}/>`;
-      if (b.left)   body += `<line x1="${xOff}"      y1="${yOff}"      x2="${xOff}"    y2="${yOff+CH}"   ${bl}/>`;
-      if (b.right)  body += `<line x1="${xOff+CW}"   y1="${yOff}"      x2="${xOff+CW}" y2="${yOff+CH}"   ${bl}/>`;
+      const b   = cellBorders[r]?.[c] || {};
+      const bc  = (v) => typeof v === 'string' ? v : '#000000';
+      const bls = (v) => `stroke="${bc(v)}" stroke-width="${CBORD_W}" stroke-linecap="square"`;
+      if (b.top)    body += `<line x1="${xOff}"    y1="${yOff}"    x2="${xOff+CW}" y2="${yOff}"    ${bls(b.top)}/>`;
+      if (b.bottom) body += `<line x1="${xOff}"    y1="${yOff+CH}" x2="${xOff+CW}" y2="${yOff+CH}" ${bls(b.bottom)}/>`;
+      if (b.left)   body += `<line x1="${xOff}"    y1="${yOff}"    x2="${xOff}"    y2="${yOff+CH}" ${bls(b.left)}/>`;
+      if (b.right)  body += `<line x1="${xOff+CW}" y1="${yOff}"    x2="${xOff+CW}" y2="${yOff+CH}" ${bls(b.right)}/>`;
     }
   }
 
@@ -1221,7 +1229,7 @@ function toggleBorder(side) {
     const cMin = Math.min(c1, c2), cMax = Math.max(c1, c2);
     for (let r = rMin; r <= rMax; r++)
       for (let c = cMin; c <= cMax; c++)
-        getBordFmt(r, c)[side] = enable;
+        getBordFmt(r, c)[side] = enable ? _bordColor : false;
   }
   _isDirty = true;
   hot.render();
@@ -1252,10 +1260,10 @@ document.getElementById('btn-bord-a').onclick = () => {
       const onEdge = r === rMin || r === rMax || c === cMin || c === cMax;
       if (!onEdge) continue;
       const b = getBordFmt(r, c);
-      if (r === rMin) b.top    = true;
-      if (r === rMax) b.bottom = true;
-      if (c === cMin) b.left   = true;
-      if (c === cMax) b.right  = true;
+      if (r === rMin) b.top    = _bordColor;
+      if (r === rMax) b.bottom = _bordColor;
+      if (c === cMin) b.left   = _bordColor;
+      if (c === cMax) b.right  = _bordColor;
     }
   }
   _isDirty = true;
@@ -1347,20 +1355,43 @@ window.addEventListener('resize', () => hot.refreshDimensions());
    • .wsheet      — JSON snapshot with data + formatting + borders
 ═══════════════════════════════════════════════════════════ */
 
-/* ── Export: .wsheet (full state — data + formatting + borders) ── */
-function exportWSheet() {
-  /* Trim trailing empty rows from data */
+/* ── Build the full wsheet state object ── */
+function _buildState() {
   const raw = hot.getData();
   let lastRow = raw.length - 1;
   while (lastRow >= 0 && raw[lastRow].every(v => v === null || v === '')) lastRow--;
 
-  const state = {
+  /* Collect non-default column widths via public HOT API */
+  const colWidths = {};
+  for (let c = 0, n = hot.countCols(); c < n; c++) {
+    try {
+      const w = hot.getColWidth(c);
+      if (w && w !== cellSize) colWidths[c] = w;
+    } catch {}
+  }
+
+  /* Collect non-default row heights up to lastRow */
+  const rowHeights = {};
+  for (let r = 0; r <= lastRow; r++) {
+    let h;
+    try { h = hot.getRowHeight(r); } catch {}
+    if (!h) { const td = hot.getCell(r, 0); h = td?.parentElement?.offsetHeight || 0; }
+    if (h && h !== cellSize) rowHeights[r] = h;
+  }
+
+  return {
     version: 1,
     data:    raw.slice(0, lastRow + 1),
     formats: cellFormats,
     borders: cellBorders,
+    colWidths,
+    rowHeights,
   };
-  const json = JSON.stringify(state);
+}
+
+/* ── Export: .wsheet (full state — data + formatting + borders) ── */
+function exportWSheet() {
+  const json = JSON.stringify(_buildState());
   const blob = new Blob([json], { type: 'application/json;charset=utf-8' });
   const url  = URL.createObjectURL(blob);
   const a    = Object.assign(document.createElement('a'), {
@@ -1383,8 +1414,18 @@ async function loadWSheetText(text, name) {
   Object.keys(cellFormats).forEach(k => delete cellFormats[k]);
   Object.keys(cellBorders).forEach(k => delete cellBorders[k]);
 
-  /* Load data */
-  hot.loadData(state.data || []);
+  /* Load data — always pad to at least 400 rows × 50 cols so the grid
+     never appears smaller than the default. Trailing empty rows/cols are
+     stripped again by _buildState when saving, so nothing extra is persisted. */
+  const MIN_ROWS = 400, MIN_COLS = 50;
+  const src = state.data || [];
+  const padded = [];
+  for (let r = 0; r < Math.max(src.length, MIN_ROWS); r++) {
+    const row = src[r] ? [...src[r]] : [];
+    while (row.length < MIN_COLS) row.push('');
+    padded.push(row);
+  }
+  hot.loadData(padded);
 
   /* Restore formatting */
   if (state.formats) {
@@ -1403,6 +1444,26 @@ async function loadWSheetText(text, name) {
         cellBorders[r][c] = bfmt;
       }
   }
+
+  /* Restore column widths and row heights.
+     Build dense arrays (length = full grid size), defaulting to cellSize,
+     then pass them as colWidths/rowHeights config so HOT uses them as base sizes.
+     manualColumnResize/manualRowResize: true resets plugin overrides from any
+     previously opened file, so the loaded sizes are what the user sees.        */
+  const nCols = hot.countCols();
+  const nRows = hot.countRows();
+  const cwArr = new Array(nCols).fill(cellSize);
+  if (state.colWidths)
+    for (const [i, w] of Object.entries(state.colWidths)) { const c = +i; if (c < nCols) cwArr[c] = w; }
+  const rhArr = new Array(nRows).fill(cellSize);
+  if (state.rowHeights)
+    for (const [i, h] of Object.entries(state.rowHeights)) { const r = +i; if (r < nRows) rhArr[r] = h; }
+  hot.updateSettings({
+    colWidths:          cwArr,
+    rowHeights:         rhArr,
+    manualColumnResize: true,
+    manualRowResize:    true,
+  });
 
   hot.render(); /* single render — afterRenderer applies formats + borders for visible cells */
   _isDirty = false;
@@ -1852,11 +1913,7 @@ async function autoSaveCurrentFile() {
     showToast(`⚠ Auto-save skipped: "${currentCloudFile}" was modified by another user.`);
     return;
   }
-  const raw = hot.getData();
-  let lastRow = raw.length - 1;
-  while (lastRow >= 0 && raw[lastRow].every(v => v === null || v === '')) lastRow--;
-  const blob = new Blob([JSON.stringify({ version:1, data: raw.slice(0, lastRow+1), formats: cellFormats, borders: cellBorders })],
-                        { type: 'application/json;charset=utf-8' });
+  const blob = new Blob([JSON.stringify(_buildState())], { type: 'application/json;charset=utf-8' });
   try {
     await storage.ref(`${STORAGE_FOLDER}/${currentCloudFile}`).put(blob, { contentType: 'application/json' });
     await _setVersion(currentCloudFile);
@@ -1898,17 +1955,7 @@ async function saveToCloud() {
   if (!currentUser) { showToast('You must be logged in to save.'); return; }
 
   /* Build the .wsheet JSON (same as exportWSheet) */
-  const raw = hot.getData();
-  let lastRow = raw.length - 1;
-  while (lastRow >= 0 && raw[lastRow].every(v => v === null || v === '')) lastRow--;
-  const state = {
-    version: 1,
-    data:    raw.slice(0, lastRow + 1),
-    formats: cellFormats,
-    borders: cellBorders,
-  };
-  const json = JSON.stringify(state);
-  const blob = new Blob([json], { type: 'application/json;charset=utf-8' });
+  const blob = new Blob([JSON.stringify(_buildState())], { type: 'application/json;charset=utf-8' });
 
   /* Use the current Firebase filename, or ask for a new one */
   let filename = currentCloudFile;
