@@ -655,6 +655,43 @@ function showToast(msg, ms = 2800) {
 ═══════════════════════════════════════════════════════════ */
 const cellBorders = {};
 
+/* Shift cellBorders + cellFormats when rows are inserted (amount>0) or removed (amount<0) */
+function _shiftRowsInStores(startIdx, amount) {
+  const stores = [cellBorders, cellFormats];
+  if (amount > 0) {
+    for (const s of stores) {
+      Object.keys(s).map(Number).filter(r => r >= startIdx).sort((a, b) => b - a)
+        .forEach(r => { s[r + amount] = s[r]; delete s[r]; });
+    }
+  } else {
+    const n = -amount;
+    for (const s of stores) {
+      for (let r = startIdx; r < startIdx + n; r++) delete s[r];
+      Object.keys(s).map(Number).filter(r => r >= startIdx + n).sort((a, b) => a - b)
+        .forEach(r => { s[r - n] = s[r]; delete s[r]; });
+    }
+  }
+}
+
+/* Shift cellBorders + cellFormats when cols are inserted (amount>0) or removed (amount<0) */
+function _shiftColsInStores(startIdx, amount) {
+  const stores = [cellBorders, cellFormats];
+  if (amount > 0) {
+    for (const s of stores)
+      for (const r of Object.keys(s))
+        Object.keys(s[r]).map(Number).filter(c => c >= startIdx).sort((a, b) => b - a)
+          .forEach(c => { s[r][c + amount] = s[r][c]; delete s[r][c]; });
+  } else {
+    const n = -amount;
+    for (const s of stores)
+      for (const r of Object.keys(s)) {
+        for (let c = startIdx; c < startIdx + n; c++) delete s[r][c];
+        Object.keys(s[r]).map(Number).filter(c => c >= startIdx + n).sort((a, b) => a - b)
+          .forEach(c => { s[r][c - n] = s[r][c]; delete s[r][c]; });
+      }
+  }
+}
+
 /* Declared here so afterRenderer can access them during initial render */
 let gridVisible  = true;
 let cellSize     = 36;
@@ -824,6 +861,11 @@ const hot = new Handsontable(document.getElementById('sheet'), {
     if (_undoing || source !== 'edit') return;
     pushUndo(_snapshotCells(changes.map(([r, c]) => [r, c])));
   },
+
+  afterCreateRow(index, amount) { _shiftRowsInStores(index, amount); },
+  afterRemoveRow(index, amount) { _shiftRowsInStores(index, -amount); },
+  afterCreateCol(index, amount) { _shiftColsInStores(index, amount); },
+  afterRemoveCol(index, amount) { _shiftColsInStores(index, -amount); },
 
   afterChange(changes) {
     if (!changes) return;
