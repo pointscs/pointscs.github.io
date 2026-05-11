@@ -467,6 +467,12 @@
 
   <div class="tb-sep"></div>
 
+  <!-- Mirror / flip -->
+  <button class="tb-btn" id="btn-mirror-h" title="Flip selection horizontally (mirror left ↔ right)">⇆</button>
+  <button class="tb-btn" id="btn-mirror-v" title="Flip selection vertically (mirror top ↕ bottom)">⇅</button>
+
+  <div class="tb-sep"></div>
+
   <!-- Grid visibility toggle -->
   <button class="tb-btn active" id="btn-grid" title="Show/hide grid">&#9783; Grid</button>
   <button class="tb-btn" id="btn-grid-minus" title="Decrease cell size" style="font-size:16px; padding:0 9px;">−</button>
@@ -1314,6 +1320,69 @@ document.getElementById('btn-bord-a').onclick = () => {
 };
 
 /* ═══════════════════════════════════════════════════════════
+   MIRROR / FLIP
+═══════════════════════════════════════════════════════════ */
+
+/* Mirrors the selected range along a vertical axis ('h') or horizontal axis ('v').
+   Values, formats and borders are all flipped; border sides are rotated to match. */
+function mirrorCells(axis) {
+  const sel = hot.getSelected();
+  if (!sel || !sel.length) return;
+  pushUndo(_snapshotCells(_selCells(sel)));
+
+  let rMin = Infinity, rMax = -Infinity, cMin = Infinity, cMax = -Infinity;
+  for (const [r1, c1, r2, c2] of sel) {
+    rMin = Math.min(rMin, r1, r2); rMax = Math.max(rMax, r1, r2);
+    cMin = Math.min(cMin, c1, c2); cMax = Math.max(cMax, c1, c2);
+  }
+
+  /* Snapshot original state so reads are unaffected by in-progress writes */
+  const snap = {};
+  for (let r = rMin; r <= rMax; r++) {
+    snap[r] = {};
+    for (let c = cMin; c <= cMax; c++) {
+      snap[r][c] = {
+        val: hot.getDataAtCell(r, c),
+        fmt: cellFormats[r]?.[c] ? { ...cellFormats[r][c] } : null,
+        brd: cellBorders[r]?.[c] ? { ...cellBorders[r][c] } : null,
+      };
+    }
+  }
+
+  function flipBorder(brd) {
+    if (!brd) return null;
+    return axis === 'h'
+      ? { top: brd.top,    bottom: brd.bottom, left: brd.right, right: brd.left }
+      : { top: brd.bottom, bottom: brd.top,    left: brd.left,  right: brd.right };
+  }
+
+  const changes = [];
+  for (let r = rMin; r <= rMax; r++) {
+    for (let c = cMin; c <= cMax; c++) {
+      const src = snap[axis === 'h' ? r : rMin + rMax - r]
+                      [axis === 'h' ? cMin + cMax - c : c];
+      changes.push([r, c, src.val]);
+
+      /* formats */
+      if (src.fmt) { if (!cellFormats[r]) cellFormats[r] = {}; cellFormats[r][c] = { ...src.fmt }; }
+      else { if (cellFormats[r]) delete cellFormats[r][c]; }
+
+      /* borders (with flipped sides) */
+      const brd = flipBorder(src.brd);
+      if (brd) { if (!cellBorders[r]) cellBorders[r] = {}; cellBorders[r][c] = brd; }
+      else { if (cellBorders[r]) delete cellBorders[r][c]; }
+    }
+  }
+
+  hot.setDataAtCell(changes);
+  _isDirty = true;
+  hot.render();
+}
+
+document.getElementById('btn-mirror-h').onclick = () => mirrorCells('h');
+document.getElementById('btn-mirror-v').onclick = () => mirrorCells('v');
+
+/* ═══════════════════════════════════════════════════════════
    BORDER POPUP  (Ctrl/Cmd + click on any cell)
 ═══════════════════════════════════════════════════════════ */
 const _borderPopup = document.getElementById('border-popup');
@@ -1429,6 +1498,12 @@ function _buildState() {
     colWidths,
     rowHeights,
   };
+}
+
+function _hashStr(s) {
+  let h = 5381;
+  for (let i = 0; i < s.length; i++) h = (h * 33 ^ s.charCodeAt(i)) >>> 0;
+  return h;
 }
 
 /* ── Export: .wsheet (full state — data + formatting + borders) ── */
@@ -1772,6 +1847,8 @@ let realtimeDb = null;
 let currentUser      = null;
 let currentCloudFile = null;
 let _isDirty         = false;
+let _lastSavedHash   = null;
+let _isSaving        = false;
 
 try {
   if (typeof firebase === 'undefined') throw new Error('Firebase SDK not loaded. Check your internet connection.');
@@ -1949,20 +2026,35 @@ async function loadFirebaseLibrary() {
 
 async function autoSaveCurrentFile() {
   if (!storage || !currentUser || !currentCloudFile) return;
-  if (!_isDirty) return;
-  /* Skip auto-save if someone else modified the file in the meantime */
+  if (_isSaving) return;
+  const json = JSON.stringify(_buildState());
+  const hash = _hashStr(json);
+  if (hash === _lastSavedHash) return;
   if (await _versionConflict(currentCloudFile)) {
     showToast(`⚠ Auto-save skipped: "${currentCloudFile}" was modified by another user.`);
     return;
   }
-  const blob = new Blob([JSON.stringify(_buildState())], { type: 'application/json;charset=utf-8' });
+  const btn = document.getElementById('btn-save-cloud');
+  _isSaving = true;
+  btn.disabled = true;
+  btn.textContent = 'Saving…';
+  const blob = new Blob([json], { type: 'application/json;charset=utf-8' });
   try {
     await storage.ref(`${STORAGE_FOLDER}/${currentCloudFile}`).put(blob, { contentType: 'application/json' });
     await _setVersion(currentCloudFile);
+    _lastSavedHash = hash;
     _isDirty = false;
-    showToast(`Auto-saved: ${currentCloudFile}`);
+    btn.textContent = '✓ Saved';
+    setTimeout(() => {
+      btn.innerHTML = '&#9729; Save in cloud';
+      btn.disabled = false;
+    }, 2000);
   } catch (err) {
     showToast(`Auto-save failed: ${err.message}`);
+    btn.innerHTML = '&#9729; Save in cloud';
+    btn.disabled = false;
+  } finally {
+    _isSaving = false;
   }
 }
 
@@ -1983,6 +2075,7 @@ async function loadFirebaseFile(filename, entryEl) {
     activeEntry = entryEl;
     entryEl.classList.add('active');
     currentCloudFile = filename;
+    _lastSavedHash = _hashStr(JSON.stringify(_buildState()));
     /* Read version + register presence (fires real-time warning if others are editing) */
     _openedVersion = await _getVersion(filename);
     await _setPresence(filename);
@@ -1995,9 +2088,9 @@ async function loadFirebaseFile(filename, entryEl) {
 async function saveToCloud() {
   if (!auth || !storage) { showToast('Firebase not available.'); return; }
   if (!currentUser) { showToast('You must be logged in to save.'); return; }
+  if (_isSaving) return;
 
-  /* Build the .wsheet JSON (same as exportWSheet) */
-  const blob = new Blob([JSON.stringify(_buildState())], { type: 'application/json;charset=utf-8' });
+  const json = JSON.stringify(_buildState());
 
   /* Use the current Firebase filename, or ask for a new one */
   let filename = currentCloudFile;
@@ -2008,27 +2101,35 @@ async function saveToCloud() {
   }
 
   const btn = document.getElementById('btn-save-cloud');
+  _isSaving = true;
   btn.disabled = true;
-  btn.textContent = '⏳ Saving…';
+  btn.textContent = 'Saving…';
 
   try {
     /* Version conflict check — warn before overwriting */
     if (await _versionConflict(filename)) {
       const overwrite = confirm(`⚠ "${filename}" was modified by another user since you opened it.\n\nOverwrite their changes?`);
-      if (!overwrite) { btn.disabled = false; btn.innerHTML = '&#9729; Save in cloud'; return; }
+      if (!overwrite) { _isSaving = false; btn.disabled = false; btn.innerHTML = '&#9729; Save in cloud'; return; }
     }
+    const blob = new Blob([json], { type: 'application/json;charset=utf-8' });
     await storage.ref(`${STORAGE_FOLDER}/${filename}`).put(blob, { contentType: 'application/json' });
     await _setVersion(filename);
     currentCloudFile = filename;
+    _lastSavedHash = _hashStr(json);
     _isDirty = false;
-    showToast(`✓ Saved to cloud: ${filename}`);
+    btn.textContent = '✓ Saved';
+    setTimeout(() => {
+      btn.innerHTML = '&#9729; Save in cloud';
+      btn.disabled = false;
+    }, 2000);
     /* Refresh library list if open */
     if (libraryOpen) loadFirebaseLibrary();
   } catch (err) {
     showToast(`✗ Upload failed: ${err.message}`);
-  } finally {
-    btn.disabled = false;
     btn.innerHTML = '&#9729; Save in cloud';
+    btn.disabled = false;
+  } finally {
+    _isSaving = false;
   }
 }
 
@@ -2198,6 +2299,9 @@ async function submitLibDel() {
 document.getElementById('libdel-overlay').addEventListener('click', e => {
   if (e.target === document.getElementById('libdel-overlay')) hideLibDelModal();
 });
+
+/* ── Autosave every 15 s ─────────────────────────────── */
+setInterval(autoSaveCurrentFile, 15000);
 </script>
 </body>
 </html>
