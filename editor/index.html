@@ -89,6 +89,7 @@
     .tb-btn:hover  { background: #f1f3f4; border-color: #dadce0; }
     .tb-btn.active { background: #e8f0fe; border-color: #4285f4; color: #1a73e8; }
     .tb-btn:focus  { outline: none; }
+    .tb-btn:disabled { opacity: 0.35; cursor: default; pointer-events: none; }
 
     .tb-sep { width: 1px; height: 20px; background: #e0e0e0; margin: 0 5px; flex-shrink: 0; }
 
@@ -203,6 +204,15 @@
     .fe-btn:hover { background: rgba(0,0,0,.08); color: #333; }
     .fe-btn.del:hover { color: #c62828; background: rgba(198,40,40,.1); }
 
+    /* ── Right-edge library hover trigger ────────────────── */
+    #lib-edge-trigger {
+      position: fixed;
+      right: 0; top: 0; bottom: 0;
+      width: 6px;
+      z-index: 200;
+      cursor: pointer;
+    }
+
     /* ── File panel footer ─────────────────────────────── */
     #file-panel-footer { border-top: 1px solid #e0e0e0; padding: 7px 8px; flex-shrink: 0; }
     #btn-new-file {
@@ -257,8 +267,8 @@
     #border-popup {
       position: fixed;
       display: none;
-      flex-direction: row;
-      gap: 2px;
+      flex-direction: column;
+      gap: 3px;
       background: #fff;
       border: 1px solid #ccc;
       border-radius: 5px;
@@ -266,11 +276,15 @@
       padding: 4px;
       z-index: 9999;
     }
+    .bp-row { display: flex; flex-direction: row; gap: 2px; }
+    .bp-row-sep { height: 1px; background: #e0e0e0; margin: 1px 0; }
+    .bp-vsep { width: 1px; background: #e0e0e0; margin: 0 2px; align-self: stretch; flex-shrink: 0; }
     #border-popup button {
       width: 30px; height: 30px;
       border: none; border-radius: 3px;
       background: transparent;
       cursor: pointer;
+      font-size: 15px;
       display: flex; align-items: center; justify-content: center;
     }
     #border-popup button:hover { background: #f1f3f4; }
@@ -425,6 +439,15 @@
 <!-- ── Toolbar ──────────────────────────────────────────────────────────── -->
 <div id="toolbar">
 
+  <!-- Undo / Redo / Clipboard -->
+  <button class="tb-btn" id="btn-undo"  title="Undo (Ctrl+Z)"       disabled>&#8617;</button>
+  <button class="tb-btn" id="btn-redo"  title="Redo (Ctrl+Shift+Z)" disabled>&#8618;</button>
+  <div class="tb-sep"></div>
+  <button class="tb-btn" id="btn-cut"   title="Cut (Ctrl+X)">&#9986;</button>
+  <button class="tb-btn" id="btn-copy"  title="Copy (Ctrl+C)">&#10697;</button>
+  <button class="tb-btn" id="btn-paste" title="Paste (Ctrl+V)">&#128203;</button>
+  <div class="tb-sep"></div>
+
   <!-- Font size -->
   <select class="tb-select" id="sel-size" style="width:54px;" title="Dimensione">
     <option>8</option><option>9</option><option>10</option><option>11</option>
@@ -503,6 +526,9 @@
 
 <!-- ── Formula bar ──────────────────────────────────────────────────────── -->
 <!-- ── Spreadsheet + File panel ─────────────────────────────────────────── -->
+<!-- Left-edge hover trigger for library -->
+<div id="lib-edge-trigger"></div>
+
 <div id="main-area">
   <div id="sheet-wrap">
     <div id="sheet"></div>
@@ -578,12 +604,23 @@
 
 <!-- ── Border popup (Ctrl/Cmd + click on cell) ──────────────────────────── -->
 <div id="border-popup">
-  <button data-side="left"   title="Left border"   onclick="toggleBorder('left')">  <span class="bord-ico l"></span></button>
-  <button data-side="right"  title="Right border"  onclick="toggleBorder('right')"> <span class="bord-ico r"></span></button>
-  <button data-side="top"    title="Top border"    onclick="toggleBorder('top')">   <span class="bord-ico t"></span></button>
-  <button data-side="bottom" title="Bottom border" onclick="toggleBorder('bottom')"><span class="bord-ico b"></span></button>
-  <button id="bp-outer"      title="All borders"   onclick="document.getElementById('btn-bord-a').click()"><span class="bord-ico a"></span></button>
-  <button id="bp-clear-fmt"  title="Clear formatting" onclick="document.getElementById('btn-clear-fmt').click()"><span class="bord-ico"></span></button>
+  <div class="bp-row">
+    <button data-side="left"   title="Left border"   onclick="toggleBorder('left')">  <span class="bord-ico l"></span></button>
+    <button data-side="right"  title="Right border"  onclick="toggleBorder('right')"> <span class="bord-ico r"></span></button>
+    <button data-side="top"    title="Top border"    onclick="toggleBorder('top')">   <span class="bord-ico t"></span></button>
+    <button data-side="bottom" title="Bottom border" onclick="toggleBorder('bottom')"><span class="bord-ico b"></span></button>
+    <button id="bp-outer"      title="All borders"   onclick="document.getElementById('btn-bord-a').click()"><span class="bord-ico a"></span></button>
+    <button id="bp-clear-fmt"  title="Clear formatting" onclick="document.getElementById('btn-clear-fmt').click()"><span class="bord-ico"></span></button>
+  </div>
+  <div class="bp-row-sep"></div>
+  <div class="bp-row">
+    <button title="Undo (Ctrl+Z)"       onclick="performUndo()">&#8617;</button>
+    <button title="Redo (Ctrl+Shift+Z)" onclick="performRedo()">&#8618;</button>
+    <div class="bp-vsep"></div>
+    <button title="Cut (Ctrl+X)"   onclick="cutToClipboard()">&#9986;</button>
+    <button title="Copy (Ctrl+C)"  onclick="copyToClipboard()">&#10697;</button>
+    <button title="Paste (Ctrl+V)" onclick="pasteFromClipboard()">&#128203;</button>
+  </div>
 </div>
 
 <script>
@@ -704,11 +741,12 @@ let cellSize     = 36;
 let baseFontSize = 16; /* scales with cellSize */
 
 /* ═══════════════════════════════════════════════════════════
-   UNDO STACK
+   UNDO / REDO STACKS
    Each entry: array of { r, c, value, fmt, border }
    capturing the "before" state of affected cells.
 ═══════════════════════════════════════════════════════════ */
 const undoStack = [];
+const redoStack = [];
 const UNDO_LIMIT = 100;
 let _undoing = false;
 
@@ -730,16 +768,7 @@ function _selCells(sel) {
   return out;
 }
 
-function pushUndo(snapshot) {
-  if (_undoing) return;
-  undoStack.push(snapshot);
-  if (undoStack.length > UNDO_LIMIT) undoStack.shift();
-}
-
-function performUndo() {
-  if (!undoStack.length) return;
-  _undoing = true;
-  const snapshot = undoStack.pop();
+function _applySnapshot(snapshot) {
   const changes = snapshot.map(({ r, c, value }) => [r, c, value ?? null]);
   for (const { r, c, fmt, border } of snapshot) {
     if (fmt)    { if (!cellFormats[r]) cellFormats[r] = {}; cellFormats[r][c] = { ...fmt }; }
@@ -749,7 +778,61 @@ function performUndo() {
   }
   hot.setDataAtCell(changes);
   hot.render();
+}
+
+function updateUndoButtons() {
+  const btnU = document.getElementById('btn-undo');
+  const btnR = document.getElementById('btn-redo');
+  if (btnU) btnU.disabled = undoStack.length === 0;
+  if (btnR) btnR.disabled = redoStack.length === 0;
+}
+
+function pushUndo(snapshot) {
+  if (_undoing) return;
+  /* If every cell in this snapshot is already covered by the last undo entry,
+     skip: that entry already holds the "before any change" state for those cells. */
+  if (undoStack.length > 0) {
+    const lastKeys = new Set(undoStack[undoStack.length - 1].map(e => `${e.r},${e.c}`));
+    if (snapshot.every(e => lastKeys.has(`${e.r},${e.c}`))) return;
+  }
+  undoStack.push(snapshot);
+  redoStack.length = 0;
+  if (undoStack.length > UNDO_LIMIT) undoStack.shift();
+  updateUndoButtons();
+}
+
+function performUndo() {
+  if (!undoStack.length) return;
+  _undoing = true;
+  const snapshot = undoStack.pop();
+  const after = snapshot.map(({ r, c }) => ({
+    r, c,
+    value:  hot.getDataAtCell(r, c),
+    fmt:    cellFormats[r]?.[c] ? { ...cellFormats[r][c] } : null,
+    border: cellBorders[r]?.[c] ? { ...cellBorders[r][c] } : null,
+  }));
+  redoStack.push(after);
+  _applySnapshot(snapshot);
   _undoing = false;
+  updateUndoButtons();
+  const s = hot.getSelected();
+  if (s && s.length) syncToolbar(s[0][0], s[0][1]);
+}
+
+function performRedo() {
+  if (!redoStack.length) return;
+  _undoing = true;
+  const snapshot = redoStack.pop();
+  const before = snapshot.map(({ r, c }) => ({
+    r, c,
+    value:  hot.getDataAtCell(r, c),
+    fmt:    cellFormats[r]?.[c] ? { ...cellFormats[r][c] } : null,
+    border: cellBorders[r]?.[c] ? { ...cellBorders[r][c] } : null,
+  }));
+  undoStack.push(before);
+  _applySnapshot(snapshot);
+  _undoing = false;
+  updateUndoButtons();
   const s = hot.getSelected();
   if (s && s.length) syncToolbar(s[0][0], s[0][1]);
 }
@@ -823,11 +906,12 @@ const hot = new Handsontable(document.getElementById('sheet'), {
   rowHeights: 36,
   customBorders: false,
   wordWrap: false,
+  undo: false,
 
   afterRenderer(TD, row, col) {
     /* Always reset all inline styles so stale styles from DOM recycling don't persist */
     const fmt = cellFormats[row]?.[col];
-    TD.style.fontSize        = fmt?.fontSize ? fmt.fontSize + 'px' : baseFontSize + 'px';
+    TD.style.fontSize        = baseFontSize + 'px';
     TD.style.fontWeight      = fmt?.bold      ? 'bold'   : '';
     TD.style.fontStyle       = fmt?.italic    ? 'italic' : '';
     const dec = [];
@@ -889,7 +973,7 @@ const hot = new Handsontable(document.getElementById('sheet'), {
 function syncToolbar(row, col) {
   const fmt = cellFormats[row]?.[col] || {};
 
-  document.getElementById('sel-size').value  = fmt.fontSize   || baseFontSize;
+  document.getElementById('sel-size').value  = baseFontSize;
   document.getElementById('sel-align').value = fmt.align      || 'center';
   document.getElementById('inp-color').value = fmt.color      || '#000000';
   document.getElementById('inp-bg').value    = fmt.bgColor    || '#ffffff';
@@ -934,7 +1018,7 @@ function updateStatus() {
 /* ═══════════════════════════════════════════════════════════
    TOOLBAR WIRING
 ═══════════════════════════════════════════════════════════ */
-document.getElementById('sel-size').onchange  = (e) => applyFmt({ fontSize: parseInt(e.target.value) });
+document.getElementById('sel-size').onchange  = (e) => { baseFontSize = parseInt(e.target.value); hot.render(); };
 document.getElementById('sel-align').onchange = (e) => applyFmt({ align: e.target.value });
 document.getElementById('inp-color').oninput     = (e) => applyFmt({ color: e.target.value });
 document.getElementById('inp-bg').oninput        = (e) => applyFmt({ bgColor: e.target.value });
@@ -1060,32 +1144,50 @@ async function pasteFromClipboard() {
   }
 }
 
+/* ── Undo / Redo button wiring ──────────────────────────────── */
+document.getElementById('btn-undo').onclick = performUndo;
+document.getElementById('btn-redo').onclick = performRedo;
+
+/* ── Clipboard helpers ──────────────────────────────────────── */
+async function cutToClipboard() {
+  await copyToClipboard();
+  const s = hot.getSelected();
+  if (!s) return;
+  const cells = _selCells(s);
+  pushUndo(_snapshotCells(cells));
+  const changes = cells.map(([r, c]) => {
+    if (cellFormats[r]) delete cellFormats[r][c];
+    if (cellBorders[r]) delete cellBorders[r][c];
+    return [r, c, null];
+  });
+  hot.setDataAtCell(changes);
+  hot.render();
+}
+
+/* ── Toolbar clipboard wiring ───────────────────────────────── */
+document.getElementById('btn-cut').onclick   = cutToClipboard;
+document.getElementById('btn-copy').onclick  = copyToClipboard;
+document.getElementById('btn-paste').onclick = pasteFromClipboard;
+
 /* ── Keyboard shortcuts ─────────────────────────────────────── */
 document.addEventListener('keydown', async (e) => {
-  if (!(e.ctrlKey || e.metaKey) || e.shiftKey || e.altKey) return;
+  if (!(e.ctrlKey || e.metaKey) || e.altKey) return;
 
-  if (e.key === 'z') { e.preventDefault(); performUndo();               return; }
-  if (e.key === 'b') { e.preventDefault(); toggleFmt('bold');           return; }
-  if (e.key === 'i') { e.preventDefault(); toggleFmt('italic');         return; }
-  if (e.key === 'u') { e.preventDefault(); toggleFmt('underline');      return; }
-  if (e.key === 'c') { e.preventDefault(); await copyToClipboard();     return; }
-  if (e.key === 'v') { e.preventDefault(); await pasteFromClipboard();  return; }
-  if (e.key === 'x') {
-    e.preventDefault();
-    await copyToClipboard();
-    const s = hot.getSelected();
-    if (!s) return;
-    const cells = _selCells(s);
-    pushUndo(_snapshotCells(cells));
-    const changes = cells.map(([r, c]) => {
-      if (cellFormats[r]) delete cellFormats[r][c];
-      if (cellBorders[r]) delete cellBorders[r][c];
-      return [r, c, null];
-    });
-    hot.setDataAtCell(changes);
-    hot.render();
-    return;
+  const k = e.key.toLowerCase();
+
+  /* Ctrl/Cmd+Shift+Z or Ctrl+Y → redo */
+  if ((e.shiftKey && k === 'z') || (!e.shiftKey && k === 'y')) {
+    e.preventDefault(); e.stopPropagation(); performRedo(); return;
   }
+  if (e.shiftKey) return;
+
+  if (k === 'z') { e.preventDefault(); e.stopPropagation(); performUndo(); return; }
+  if (k === 'b') { e.preventDefault(); toggleFmt('bold');           return; }
+  if (k === 'i') { e.preventDefault(); toggleFmt('italic');         return; }
+  if (k === 'u') { e.preventDefault(); toggleFmt('underline');      return; }
+  if (k === 'c') { e.preventDefault(); await copyToClipboard();     return; }
+  if (k === 'v') { e.preventDefault(); await pasteFromClipboard();  return; }
+  if (k === 'x') { e.preventDefault(); await cutToClipboard(); return; }
 });
 
 /* ═══════════════════════════════════════════════════════════
@@ -1141,7 +1243,7 @@ function buildSvg(rMin, rMax, cMin, cMax) {
 
       const fmt = cellFormats[r]?.[c] || {};
       const fg  = fmt.color    || '#222222';
-      const fs  = fmt.fontSize || baseFontSize;
+      const fs  = baseFontSize;
       const fw  = fmt.bold     ? 'bold'   : 'normal';
       const fi  = fmt.italic   ? 'italic' : 'normal';
       const decParts = [];
@@ -1812,22 +1914,50 @@ const filePanel   = document.getElementById('file-panel');
 const fileListEl  = document.getElementById('file-list');
 const btnLibrary  = document.getElementById('btn-library');
 
-function toggleLibrary() {
-  libraryOpen = !libraryOpen;
-  filePanel.classList.toggle('closed', !libraryOpen);
-  btnLibrary.classList.toggle('active', libraryOpen);
-  if (libraryOpen) {
-    hot.refreshDimensions();
-    /* Load from Firebase if the user is logged in, otherwise prompt */
-    if (typeof currentUser !== 'undefined' && currentUser) {
-      loadFirebaseLibrary();
-    } else {
-      fileListEl.innerHTML = '<div style="padding:10px;color:#aaa;font-size:11px;">Login to access the library</div>';
-    }
+function openLibrary() {
+  if (libraryOpen) return;
+  libraryOpen = true;
+  filePanel.classList.remove('closed');
+  btnLibrary.classList.add('active');
+  hot.refreshDimensions();
+  if (typeof currentUser !== 'undefined' && currentUser) {
+    loadFirebaseLibrary();
+  } else {
+    fileListEl.innerHTML = '<div style="padding:10px;color:#aaa;font-size:11px;">Login to access the library</div>';
   }
 }
 
+function closeLibrary() {
+  if (!libraryOpen) return;
+  libraryOpen = false;
+  filePanel.classList.add('closed');
+  btnLibrary.classList.remove('active');
+  hot.refreshDimensions();
+}
+
+function toggleLibrary() {
+  if (libraryOpen) closeLibrary(); else openLibrary();
+}
+
 btnLibrary.onclick = toggleLibrary;
+
+/* ── Left-edge hover: open/close library ─────────────────── */
+const libEdgeTrigger = document.getElementById('lib-edge-trigger');
+let _libCloseTimer = null;
+
+function _scheduleLibClose() {
+  clearTimeout(_libCloseTimer);
+  _libCloseTimer = setTimeout(closeLibrary, 350);
+}
+
+function _cancelLibClose() {
+  clearTimeout(_libCloseTimer);
+}
+
+libEdgeTrigger.addEventListener('mouseenter', () => { _cancelLibClose(); openLibrary(); });
+libEdgeTrigger.addEventListener('mouseleave', _scheduleLibClose);
+filePanel.addEventListener('mouseenter', _cancelLibClose);
+filePanel.addEventListener('mouseleave', _scheduleLibClose);
 
 /* ── Auto-load template on startup ── */
 fetch('./data/template.wsheet')
