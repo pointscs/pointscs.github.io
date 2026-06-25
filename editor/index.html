@@ -8,8 +8,8 @@
   <!-- Handsontable Community Edition -->
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/handsontable@14.6.1/dist/handsontable.full.min.css">
   <script src="https://cdn.jsdelivr.net/npm/handsontable@14.6.1/dist/handsontable.full.min.js"></script>
-  <!-- SheetJS — reads/writes xlsx, ods, csv and many other formats -->
-  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <!-- xlsx-js-style — SheetJS fork with full cell-style write support -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
 
   <!-- Firebase SDK (compat v10) -->
   <script src="https://www.gstatic.com/firebasejs/10.0.0/firebase-app-compat.js"></script>
@@ -511,9 +511,9 @@
   <button class="tb-btn" id="btn-library"
     title="Open/close file library">&#128218; Library</button>
   <button class="tb-btn" id="btn-open"
-    title="Open file (xlsx, ods, csv, .wsheet, Google Sheets html)">&#128193; Open</button>
+    title="Open file (xlsx, ods, csv, Google Sheets html)">&#128193; Open</button>
   <button class="tb-btn" id="btn-save-ws"
-    title="Save full sheet with formatting and borders (.wsheet)">&#8659; Save</button>
+    title="Save as .xlsx with full formatting">&#8659; Save .xlsx</button>
   <button id="btn-save-cloud" onclick="saveToCloud()"
     title="Overwrite file on Firebase Cloud Storage">&#9729; Save in cloud</button>
 
@@ -1621,6 +1621,74 @@ function exportWSheet() {
   showToast('Saved: websheet.wsheet');
 }
 
+/* ── Export: .xlsx (data + full styles + col widths + row heights) ── */
+function exportXLSX() {
+  const raw = hot.getData();
+
+  /* Compute content bounds — include cells with formatting even if empty */
+  let lastRow = 0, lastCol = 0;
+  for (let r = 0; r < raw.length; r++)
+    for (let c = 0; c < (raw[r]?.length || 0); c++)
+      if (raw[r][c] !== null && raw[r][c] !== '') { lastRow = Math.max(lastRow, r); lastCol = Math.max(lastCol, c); }
+  for (const r of Object.keys(cellFormats)) { lastRow = Math.max(lastRow, +r); for (const c of Object.keys(cellFormats[r])) lastCol = Math.max(lastCol, +c); }
+  for (const r of Object.keys(cellBorders)) { lastRow = Math.max(lastRow, +r); for (const c of Object.keys(cellBorders[r])) lastCol = Math.max(lastCol, +c); }
+
+  /* hex #rrggbb → 6-char uppercase RGB for xlsx */
+  const toRgb = (hex) => (hex || '#000000').replace('#', '').toUpperCase().padStart(6, '0');
+  const bdrSide = (color) => ({ style: 'thin', color: { rgb: toRgb(typeof color === 'string' ? color : '#000000') } });
+
+  const ws = {};
+  for (let r = 0; r <= lastRow; r++) {
+    for (let c = 0; c <= lastCol; c++) {
+      const addr = XLSX.utils.encode_cell({ r, c });
+      const v    = raw[r]?.[c] ?? '';
+      const num  = parseFloat(v);
+      const isNum = v !== '' && v !== null && !isNaN(num) && isFinite(num);
+      const fmt  = cellFormats[r]?.[c] || {};
+      const brd  = cellBorders[r]?.[c] || {};
+
+      const s = {};
+
+      /* Font */
+      const font = { name: 'Arial' };
+      if (fmt.bold)      font.bold      = true;
+      if (fmt.italic)    font.italic    = true;
+      if (fmt.underline) font.underline = true;
+      if (fmt.strike)    font.strike    = true;
+      if (fmt.color && fmt.color !== '#000000') font.color = { rgb: toRgb(fmt.color) };
+      s.font = font;
+
+      /* Fill */
+      if (fmt.bgColor && fmt.bgColor !== '#ffffff')
+        s.fill = { patternType: 'solid', fgColor: { rgb: toRgb(fmt.bgColor) } };
+
+      /* Alignment */
+      s.alignment = { horizontal: fmt.align || 'center', vertical: 'center' };
+
+      /* Borders */
+      if (brd.top || brd.right || brd.bottom || brd.left) {
+        s.border = {};
+        if (brd.top)    s.border.top    = bdrSide(brd.top);
+        if (brd.right)  s.border.right  = bdrSide(brd.right);
+        if (brd.bottom) s.border.bottom = bdrSide(brd.bottom);
+        if (brd.left)   s.border.left   = bdrSide(brd.left);
+      }
+
+      ws[addr] = { v: isNum ? num : v, t: isNum ? 'n' : 's', s };
+    }
+  }
+
+  ws['!ref']  = XLSX.utils.encode_range({ s: { r:0, c:0 }, e: { r: lastRow, c: lastCol } });
+  ws['!cols'] = Array.from({ length: lastCol + 1 }, (_, c) => ({ wch: Math.max(1, Math.round(getColW(c) / 7)) }));
+  ws['!rows'] = Array.from({ length: lastRow + 1 }, (_, r) => ({ hpt: Math.max(6, Math.round(getRowH(r) * 0.75)) }));
+
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Sheet1');
+  const name = `websheet-${new Date().toISOString().slice(0,10)}.xlsx`;
+  XLSX.writeFile(wb, name, { bookType: 'xlsx', cellStyles: true });
+  showToast(`Saved: ${name}`);
+}
+
 /* ── .wsheet loader (shared by file import and auto-load) ── */
 async function loadWSheetText(text, name) {
   const state = JSON.parse(text);
@@ -1857,34 +1925,81 @@ function handleFileImport(file) {
         const ws   = wb.Sheets[wb.SheetNames[0]];
         const aoa  = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
 
-        /* Clear formatting and borders */
+        /* Clear state */
         Object.keys(cellFormats).forEach(k => delete cellFormats[k]);
         Object.keys(cellBorders).forEach(k => delete cellBorders[k]);
 
         hot.loadData(aoa);
 
-        /* Extract borders from xlsx cell styles into store */
+        /* ARGB/RGB hex from xlsx → internal #rrggbb */
+        const fromRgb = (rgb) => rgb ? '#' + rgb.slice(-6).toLowerCase() : null;
+
+        /* Extract all cell styles */
         const ref = ws['!ref'];
         if (ref) {
           const range = XLSX.utils.decode_range(ref);
           for (let r = range.s.r; r <= range.e.r; r++) {
             for (let c = range.s.c; c <= range.e.c; c++) {
               const cell = ws[XLSX.utils.encode_cell({ r, c })];
-              if (!cell?.s?.border) continue;
-              const b = cell.s.border;
-              if (!b.top?.style && !b.bottom?.style && !b.left?.style && !b.right?.style) continue;
-              if (!cellBorders[r]) cellBorders[r] = {};
-              cellBorders[r][c] = {
-                top:    !!b.top?.style,
-                bottom: !!b.bottom?.style,
-                left:   !!b.left?.style,
-                right:  !!b.right?.style,
-              };
+              if (!cell?.s) continue;
+              const s   = cell.s;
+              const fmt = {};
+              const brd = {};
+
+              /* Font */
+              if (s.font) {
+                if (s.font.bold)      fmt.bold      = true;
+                if (s.font.italic)    fmt.italic    = true;
+                if (s.font.underline) fmt.underline = true;
+                if (s.font.strike)    fmt.strike    = true;
+                const fc = fromRgb(s.font.color?.rgb);
+                if (fc && fc !== '#000000') fmt.color = fc;
+              }
+
+              /* Fill */
+              const fg = fromRgb(s.fill?.fgColor?.rgb);
+              if (fg && fg !== '#ffffff' && fg !== '#000000') fmt.bgColor = fg;
+
+              /* Alignment */
+              if (s.alignment?.horizontal) fmt.align = s.alignment.horizontal;
+
+              /* Borders (preserve color) */
+              if (s.border) {
+                const b = s.border;
+                const bSide = (side) => {
+                  if (!side?.style) return null;
+                  const col = fromRgb(side.color?.rgb);
+                  return col || '#000000';
+                };
+                const bt = bSide(b.top), br = bSide(b.right), bb = bSide(b.bottom), bl = bSide(b.left);
+                if (bt || br || bb || bl) { brd.top = bt; brd.right = br; brd.bottom = bb; brd.left = bl; }
+              }
+
+              if (Object.keys(fmt).length) { if (!cellFormats[r]) cellFormats[r] = {}; cellFormats[r][c] = fmt; }
+              if (Object.keys(brd).length) { if (!cellBorders[r]) cellBorders[r] = {}; cellBorders[r][c] = brd; }
             }
           }
         }
 
-        hot.render(); /* single render */
+        /* Column widths */
+        const nCols = hot.countCols();
+        const nRows = hot.countRows();
+        const cwArr = new Array(nCols).fill(cellSize);
+        if (ws['!cols']) ws['!cols'].forEach((col, c) => {
+          if (c >= nCols) return;
+          if (col.wpx)      cwArr[c] = col.wpx;
+          else if (col.wch) cwArr[c] = Math.round(col.wch * 7);
+        });
+        /* Row heights */
+        const rhArr = new Array(nRows).fill(cellSize);
+        if (ws['!rows']) ws['!rows'].forEach((row, r) => {
+          if (r >= nRows || !row) return;
+          if (row.hpx)      rhArr[r] = row.hpx;
+          else if (row.hpt) rhArr[r] = Math.round(row.hpt / 0.75);
+        });
+        hot.updateSettings({ colWidths: cwArr, rowHeights: rhArr, manualColumnResize: true, manualRowResize: true });
+
+        hot.render();
         showToast(`Opened: ${file.name} (${wb.SheetNames[0]})`);
       } catch (err) {
         showToast(`Error reading file: ${err.message}`);
@@ -1902,7 +2017,7 @@ fileInput.addEventListener('change', (e) => {
 });
 
 document.getElementById('btn-open').onclick    = () => fileInput.click();
-document.getElementById('btn-save-ws').onclick = exportWSheet;
+document.getElementById('btn-save-ws').onclick = exportXLSX;
 
 /* ═══════════════════════════════════════════════════════════
    FILE LIBRARY PANEL
