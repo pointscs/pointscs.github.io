@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>POINTS — Sequences Editor</title>
+  <link rel="icon" type="image/png" href="src/logo.png">
 
   <!-- Handsontable Community Edition -->
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/handsontable@14.6.1/dist/handsontable.full.min.css">
@@ -44,16 +45,17 @@
       box-shadow: 0 2px 4px rgba(0,0,0,.18);
       z-index: 10;
     }
-    #app-logo {
-      width: 28px; height: 28px;
-      background: #fff;
-      border-radius: 4px;
-      display: flex; align-items: center; justify-content: center;
-      font-size: 17px;
-      flex-shrink: 0;
+    #app-logo-img { height: 30px; flex-shrink: 0; }
+    #sheet-name {
+      font-size: 13px;
+      font-weight: 500;
+      color: #555;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 220px;
+      pointer-events: none;
     }
-    #app-title { font-size: 17px; font-weight: 600; letter-spacing: .2px; }
-    #app-subtitle { font-size: 12px; opacity: .75; margin-left: 2px; }
 
     /* ── Toolbar ──────────────────────────────────────────── */
     #toolbar {
@@ -422,9 +424,7 @@
 
 <!-- ── App bar ──────────────────────────────────────────────────────────── -->
 <div id="app-bar">
-  <div id="app-logo">&#9783;</div>
-  <span id="app-title">POINTS</span>
-  <span id="app-subtitle">Sequences Editor</span>
+  <img id="app-logo-img" src="src/logo_text.png" alt="POINTS">
 
   <!-- Auth area -->
   <div id="auth-area">
@@ -501,7 +501,9 @@
   <button class="tb-btn" id="btn-grid-minus" title="Decrease cell size" style="font-size:16px; padding:0 9px;">−</button>
   <button class="tb-btn" id="btn-grid-plus"  title="Increase cell size" style="font-size:16px; padding:0 9px;">+</button>
 
-  <!-- Spacer -->
+  <!-- Sheet name (centered) -->
+  <div style="flex:1; min-width:8px;"></div>
+  <span id="sheet-name"></span>
   <div style="flex:1; min-width:8px;"></div>
 
   <!-- Import / Export -->
@@ -690,6 +692,12 @@ function showToast(msg, ms = 2800) {
   el.textContent = msg;
   el.classList.add('show');
   setTimeout(() => el.classList.remove('show'), ms);
+}
+
+function setSheetName(filename) {
+  const el = document.getElementById('sheet-name');
+  if (!el) return;
+  el.textContent = filename ? filename.replace(/\.[^.]+$/, '') : '';
 }
 
 /* ═══════════════════════════════════════════════════════════
@@ -1753,7 +1761,7 @@ async function loadWSheetText(text, name) {
   hot.render(); /* single render — afterRenderer applies formats + borders for visible cells */
   _isDirty = false;
   document.getElementById('st-msg').textContent = '';
-  if (name) showToast(`Opened: ${name}`);
+  if (name) { setSheetName(name); showToast(`Opened: ${name}`); }
 }
 
 /* ═══════════════════════════════════════════════════════════
@@ -1886,6 +1894,7 @@ function handleGoogleSheetsHtml(file) {
       }
 
       hot.render(); /* single render */
+      setSheetName(file.name);
       const borderTotal = Object.values(newBorders).reduce((n, cols) => n + Object.keys(cols).length, 0);
       showToast(`Opened: ${file.name} (${aoa.length} rows, ${borderTotal} bordered cells)`);
     } catch (err) {
@@ -1998,6 +2007,7 @@ function handleFileImport(file) {
         hot.updateSettings({ colWidths: cwArr, rowHeights: rhArr, manualColumnResize: true, manualRowResize: true });
 
         hot.render();
+        setSheetName(file.name);
         showToast(`Opened: ${file.name} (${wb.SheetNames[0]})`);
       } catch (err) {
         showToast(`Error reading file: ${err.message}`);
@@ -2479,7 +2489,7 @@ async function submitLibName() {
       await storage.ref(`${STORAGE_FOLDER}/${filename}`).put(blob, { contentType: 'application/json' });
       await storage.ref(`${STORAGE_FOLDER}/${_libNameTarget}`).delete();
       /* Update state if renamed file was the open one */
-      if (currentCloudFile === _libNameTarget) currentCloudFile = filename;
+      if (currentCloudFile === _libNameTarget) { currentCloudFile = filename; setSheetName(filename); }
       showToast(`Renamed to: ${filename}`);
     }
     hideLibNameModal();
