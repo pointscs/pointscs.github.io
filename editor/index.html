@@ -642,7 +642,7 @@ function getFmt(row, col) {
 function applyFmt(props) {
   const sel = hot.getSelected();
   if (!sel) return;
-  pushUndo(_snapshotCells(_selCells(sel)));
+  pushUndo();
   for (const [r1, c1, r2, c2] of sel) {
     const rMin = Math.min(r1, r2), rMax = Math.max(r1, r2);
     const cMin = Math.min(c1, c2), cMax = Math.max(c1, c2);
@@ -742,22 +742,17 @@ let baseFontSize = 16; /* scales with cellSize */
 
 /* ═══════════════════════════════════════════════════════════
    UNDO / REDO STACKS
-   Each entry: array of { r, c, value, fmt, border }
-   capturing the "before" state of affected cells.
+   Each entry: { cells: [{r,c,value}], formats: {}, borders: {} }
+   • cells   = old VALUES of cells whose content changed ([] for style-only ops)
+   • formats = full deep-copy of cellFormats BEFORE the action
+   • borders = full deep-copy of cellBorders BEFORE the action
+   Storing the full style state (not per-cell diffs) makes border/format
+   undo perfectly reliable regardless of selection size or overlap.
 ═══════════════════════════════════════════════════════════ */
 const undoStack = [];
 const redoStack = [];
 const UNDO_LIMIT = 100;
 let _undoing = false;
-
-function _snapshotCells(cells) {
-  return cells.map(([r, c]) => ({
-    r, c,
-    value:  hot.getDataAtCell(r, c),
-    fmt:    cellFormats[r]?.[c] ? { ...cellFormats[r][c] } : null,
-    border: cellBorders[r]?.[c] ? { ...cellBorders[r][c] } : null,
-  }));
-}
 
 function _selCells(sel) {
   const out = [];
@@ -768,16 +763,24 @@ function _selCells(sel) {
   return out;
 }
 
-function _applySnapshot(snapshot) {
-  const changes = snapshot.map(({ r, c, value }) => [r, c, value ?? null]);
-  for (const { r, c, fmt, border } of snapshot) {
-    if (fmt)    { if (!cellFormats[r]) cellFormats[r] = {}; cellFormats[r][c] = { ...fmt }; }
-    else        { if (cellFormats[r]) delete cellFormats[r][c]; }
-    if (border) { if (!cellBorders[r]) cellBorders[r] = {}; cellBorders[r][c] = { ...border }; }
-    else        { if (cellBorders[r]) delete cellBorders[r][c]; }
+function _deepStyles() {
+  return {
+    formats: JSON.parse(JSON.stringify(cellFormats)),
+    borders: JSON.parse(JSON.stringify(cellBorders)),
+  };
+}
+
+function _restoreStyles(formats, borders) {
+  Object.keys(cellFormats).forEach(k => delete cellFormats[k]);
+  for (const [r, cols] of Object.entries(formats || {})) {
+    cellFormats[r] = {};
+    for (const [c, fmt] of Object.entries(cols)) cellFormats[r][c] = { ...fmt };
   }
-  hot.setDataAtCell(changes);
-  hot.render();
+  Object.keys(cellBorders).forEach(k => delete cellBorders[k]);
+  for (const [r, cols] of Object.entries(borders || {})) {
+    cellBorders[r] = {};
+    for (const [c, brd] of Object.entries(cols)) cellBorders[r][c] = { ...brd };
+  }
 }
 
 function updateUndoButtons() {
@@ -787,54 +790,49 @@ function updateUndoButtons() {
   if (btnR) btnR.disabled = redoStack.length === 0;
 }
 
-function pushUndo(snapshot) {
+/* valueCells = [{r, c, value}] with the BEFORE values of cells whose content
+   is changing. Pass [] (or omit) for style-only operations — styles are always
+   captured in full automatically. */
+function pushUndo(valueCells = []) {
   if (_undoing) return;
-  /* If every cell in this snapshot is already covered by the last undo entry,
-     skip: that entry already holds the "before any change" state for those cells. */
-  if (undoStack.length > 0) {
-    const lastKeys = new Set(undoStack[undoStack.length - 1].map(e => `${e.r},${e.c}`));
-    if (snapshot.every(e => lastKeys.has(`${e.r},${e.c}`))) return;
-  }
-  undoStack.push(snapshot);
+  const { formats, borders } = _deepStyles();
+  undoStack.push({ cells: valueCells, formats, borders });
   redoStack.length = 0;
   if (undoStack.length > UNDO_LIMIT) undoStack.shift();
   updateUndoButtons();
 }
 
-function performUndo() {
-  if (!undoStack.length) return;
-  _undoing = true;
-  const snapshot = undoStack.pop();
-  const after = snapshot.map(({ r, c }) => ({
-    r, c,
-    value:  hot.getDataAtCell(r, c),
-    fmt:    cellFormats[r]?.[c] ? { ...cellFormats[r][c] } : null,
-    border: cellBorders[r]?.[c] ? { ...cellBorders[r][c] } : null,
-  }));
-  redoStack.push(after);
-  _applySnapshot(snapshot);
-  _undoing = false;
+function _applyUndoEntry(entry, captureInto) {
+  /* Snapshot current state into the opposite stack before changing anything */
+  const { formats, borders } = _deepStyles();
+  captureInto.push({
+    cells:   entry.cells.map(({ r, c }) => ({ r, c, value: hot.getDataAtCell(r, c) })),
+    formats, borders,
+  });
+  /* Restore cell values (if any) */
+  if (entry.cells.length) {
+    hot.setDataAtCell(entry.cells.map(({ r, c, value }) => [r, c, value ?? null]));
+  }
+  /* Restore full style state */
+  _restoreStyles(entry.formats, entry.borders);
+  hot.render();
   updateUndoButtons();
   const s = hot.getSelected();
   if (s && s.length) syncToolbar(s[0][0], s[0][1]);
 }
 
+function performUndo() {
+  if (!undoStack.length) return;
+  _undoing = true;
+  _applyUndoEntry(undoStack.pop(), redoStack);
+  _undoing = false;
+}
+
 function performRedo() {
   if (!redoStack.length) return;
   _undoing = true;
-  const snapshot = redoStack.pop();
-  const before = snapshot.map(({ r, c }) => ({
-    r, c,
-    value:  hot.getDataAtCell(r, c),
-    fmt:    cellFormats[r]?.[c] ? { ...cellFormats[r][c] } : null,
-    border: cellBorders[r]?.[c] ? { ...cellBorders[r][c] } : null,
-  }));
-  undoStack.push(before);
-  _applySnapshot(snapshot);
+  _applyUndoEntry(redoStack.pop(), undoStack);
   _undoing = false;
-  updateUndoButtons();
-  const s = hot.getSelected();
-  if (s && s.length) syncToolbar(s[0][0], s[0][1]);
 }
 
 /* ═══════════════════════════════════════════════════════════
@@ -857,7 +855,7 @@ const hot = new Handsontable(document.getElementById('sheet'), {
           const s = hot.getSelected();
           if (!s) return;
           const cells = _selCells(s);
-          pushUndo(_snapshotCells(cells));
+          pushUndo(cells.map(([r, c]) => ({ r, c, value: hot.getDataAtCell(r, c) })));
           const changes = cells.map(([r, c]) => {
             if (cellFormats[r]) delete cellFormats[r][c];
             if (cellBorders[r]) delete cellBorders[r][c];
@@ -949,7 +947,7 @@ const hot = new Handsontable(document.getElementById('sheet'), {
 
   beforeChange(changes, source) {
     if (_undoing || source !== 'edit') return;
-    pushUndo(_snapshotCells(changes.map(([r, c]) => [r, c])));
+    pushUndo(changes.map(([r, c, oldVal]) => ({ r, c, value: oldVal })));
   },
 
   afterCreateRow(index, amount) { _shiftRowsInStores(index, amount); },
@@ -1029,7 +1027,7 @@ document.getElementById('inp-bord-color').oninput = (e) => { _bordColor = e.targ
 document.getElementById('btn-clear-fmt').onclick = () => {
   const sel = hot.getSelected();
   if (!sel) return;
-  pushUndo(_snapshotCells(_selCells(sel)));
+  pushUndo();
   for (const [r1, c1, r2, c2] of sel) {
     for (let r = Math.min(r1, r2); r <= Math.max(r1, r2); r++) {
       for (let c = Math.min(c1, c2); c <= Math.max(c1, c2); c++) {
@@ -1110,7 +1108,7 @@ async function pasteFromClipboard() {
     /* ── Full paste: values + formatting + borders ── */
     const destCells = internalClipboard.grid.flatMap((row, ri) =>
       row.map((_, ci) => [r0 + ri, c0 + ci]));
-    pushUndo(_snapshotCells(destCells));
+    pushUndo(destCells.map(([r, c]) => ({ r, c, value: hot.getDataAtCell(r, c) })));
     const changes = [];
     internalClipboard.grid.forEach((row, ri) => {
       row.forEach((cell, ci) => {
@@ -1135,7 +1133,7 @@ async function pasteFromClipboard() {
     /* ── External paste: TSV only — formatting/borders untouched ── */
     const parsed = systemText.replace(/\r\n?/g, '\n').trimEnd()
       .split('\n').map(row => row.split('\t'));
-    pushUndo(_snapshotCells(parsed.flatMap((row, ri) => row.map((_, ci) => [r0 + ri, c0 + ci]))));
+    pushUndo(parsed.flatMap((row, ri) => row.map((_, ci) => ({ r: r0 + ri, c: c0 + ci, value: hot.getDataAtCell(r0 + ri, c0 + ci) }))));
     hot.setDataAtCell(
       parsed.flatMap((row, ri) => row.map((v, ci) => [r0 + ri, c0 + ci, v]))
     );
@@ -1154,7 +1152,7 @@ async function cutToClipboard() {
   const s = hot.getSelected();
   if (!s) return;
   const cells = _selCells(s);
-  pushUndo(_snapshotCells(cells));
+  pushUndo(cells.map(([r, c]) => ({ r, c, value: hot.getDataAtCell(r, c) })));
   const changes = cells.map(([r, c]) => {
     if (cellFormats[r]) delete cellFormats[r][c];
     if (cellBorders[r]) delete cellBorders[r][c];
@@ -1370,7 +1368,7 @@ function applyBorderToCell(/* row, col — no-op, hot.render() called by caller 
 function toggleBorder(side) {
   const sel = hot.getSelected();
   if (!sel || !sel.length) return;
-  pushUndo(_snapshotCells(_selCells(sel)));
+  pushUndo();
 
   const enable = !getBordFmt(sel[0][0], sel[0][1])[side];
 
@@ -1396,7 +1394,7 @@ document.getElementById('btn-bord-r').onclick = () => toggleBorder('right');
 document.getElementById('btn-bord-a').onclick = () => {
   const sel = hot.getSelected();
   if (!sel || !sel.length) return;
-  pushUndo(_snapshotCells(_selCells(sel)));
+  pushUndo();
 
   /* Compute the overall bounding box across all selection areas */
   let rMin = Infinity, rMax = -Infinity, cMin = Infinity, cMax = -Infinity;
@@ -1430,7 +1428,7 @@ document.getElementById('btn-bord-a').onclick = () => {
 function mirrorCells(axis) {
   const sel = hot.getSelected();
   if (!sel || !sel.length) return;
-  pushUndo(_snapshotCells(_selCells(sel)));
+  pushUndo(_selCells(sel).map(([r, c]) => ({ r, c, value: hot.getDataAtCell(r, c) })));
 
   let rMin = Infinity, rMax = -Infinity, cMin = Infinity, cMax = -Infinity;
   for (const [r1, c1, r2, c2] of sel) {
