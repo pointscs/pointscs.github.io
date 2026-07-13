@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <title>POINTS - Workshop</title>
+    <meta charset="utf-8">
+    <link rel="stylesheet" href="../style.css">
+    <link rel="stylesheet"
+          href="https://fonts.googleapis.com/css?family=Montserrat">
+    <meta name="viewport"
+    content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0">
+    <style>
+      .workshop_intro {
+          padding-top: 8rem;
+          padding-bottom: 2rem;
+      }
+      .workshop_logo {
+          width: 8rem;
+          height: 8rem;
+      }
+      .message_text {
+          width: 60%;
+          margin: 0 auto;
+          text-align: center;
+      }
+      .message_text p {
+          font-size: 1.1rem;
+          line-height: 1.6;
+      }
+      .message_text a.msg_link {
+          padding: 0;
+          color: #5aa9aa;
+          font-weight: 600;
+          text-decoration: underline;
+          text-underline-offset: 3px;
+          transition: color 0.15s;
+      }
+      .message_text a.msg_link:hover {
+          color: #6bc3c5;
+      }
+      .video_wrapper {
+          position: relative;
+          width: 80%;
+          max-width: 900px;
+          margin: 2rem auto;
+          aspect-ratio: 16 / 9;
+          border-radius: 1rem;
+          overflow: hidden;
+          box-shadow: 0 1px 5px rgba(0,0,0,0.12), 0 1px 2px rgba(0,0,0,0.24);
+      }
+      .video_wrapper iframe,
+      .video_wrapper #yt-player {
+          position: absolute;
+          inset: 0;
+          width: 100%;
+          height: 100%;
+          border: none;
+      }
+      .chapters_container {
+          width: 60%;
+          max-width: 700px;
+          margin: 1rem auto 3rem;
+          background-color: azure;
+          border-radius: 1rem;
+          padding: 0.5rem;
+      }
+      .chapter_item {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          padding: 0.6rem 1rem;
+          border-radius: 0.5rem;
+          cursor: pointer;
+          transition: background-color 0.15s;
+      }
+      .chapter_item:hover {
+          background-color: #90d0d5;
+      }
+      .chapter_item.concept {
+          font-weight: bold;
+      }
+      .chapter_name {
+          font-family: "Montserrat", sans-serif;
+          color: rgb(34, 34, 34);
+      }
+      .chapter_time {
+          font-family: "Montserrat", sans-serif;
+          color: #5aa9aa;
+          font-weight: bold;
+          font-variant-numeric: tabular-nums;
+          margin-left: 1rem;
+          white-space: nowrap;
+      }
+
+      @media only screen and (max-width: 950px) {
+          .message_text, .chapters_container {
+              width: 88%;
+          }
+          .video_wrapper {
+              width: 92%;
+          }
+      }
+    </style>
+  </head>
+  <body>
+    <a href="../index.html"><img class="go_to_top" src="../src/go_to_top.svg" alt="Points light logo"></a>
+
+    <div class="content_container workshop_intro">
+        <div class="logo_container">
+            <img class="workshop_logo" src="../src/logo_chiaro.svg" alt="Points logo">
+        </div>
+        <div class="message_text">
+            <p>
+                Hi,<br>
+                It's Lucas &amp; Shawn from Points Notation.
+                <br><br>
+                Thanks for having bought the cards.<br>
+                Keep scrolling to see the online workshop!<br>
+                In the description you can find the timestamps so you can go directly to the explanation of the cards you don't understand. We think the system is very intuitive so there's probably no need to see the explanation of <i>every</i> card (but we explained them all because you never know which one is not going to be understood!).
+                <br><br>
+                Do <a class="msg_link" href="mailto:pointsnotation@gmail.com">write us</a> if you have doubts or feedback.
+                <br><br>
+                On instagram: <a class="msg_link" href="https://www.instagram.com/points_notation/" target="_blank">@points_notation</a>
+            </p>
+        </div>
+    </div>
+
+    <div class="content_container main_color_bg" id="workshop">
+        <center><h3>The Workshop</h3></center>
+        <div class="video_wrapper">
+            <div id="yt-player"></div>
+        </div>
+        <div class="chapters_container" id="chapters_list"></div>
+    </div>
+
+    <script>
+      const CHAPTERS = [
+        { note: "Introduction", time: "0:00" },
+        { note: "Concept: The block", time: "0:11", concept: true },
+        { note: "Block: 01", time: "1:35" },
+        { note: "Block: 02", time: "3:17" },
+        { note: "Block: 03", time: "3:57" },
+        { note: "Block: 04", time: "4:29" },
+        { note: "Block: 05", time: "4:54" },
+        { note: "Block: 06", time: "5:26" },
+        { note: "Block: 07", time: "6:28" },
+        { note: "Block: 08", time: "6:48" },
+        { note: "Block: 09", time: "7:36" },
+        { note: "Block: 10", time: "8:02" },
+        { note: "Block: 11", time: "8:42" },
+        { note: "Block: 12", time: "9:11" },
+        { note: "Block: 13", time: "9:44" },
+        { note: "Block: 14", time: "10:20" },
+        { note: "Block: 15", time: "10:51" },
+        { note: "Block: 16", time: "11:30" },
+        { note: "Block: 17", time: "12:32" },
+        { note: "Block: 18", time: "14:06" },
+        { note: "Block: 19", time: "15:15" },
+        { note: "Block: 20", time: "15:39" },
+        { note: "Block: 20", time: "16:26" },
+        { note: "Concept: Tap", time: "17:08", concept: true },
+        { note: "Block: 21", time: "17:37" },
+        { note: "Block: 23", time: "18:09" },
+        { note: "Block: 24", time: "18:43" },
+        { note: "Concept: Zap", time: "19:53", concept: true },
+        { note: "Block: 25", time: "20:17" },
+        { note: "Block: 26", time: "20:41" },
+        { note: "Block: 27", time: "21:12" },
+        { note: "Block: 28", time: "21:41" },
+        { note: "Block: 29", time: "22:19" },
+        { note: "Block: 30", time: "22:59" },
+        { note: "Block: 31", time: "23:46" },
+        { note: "Block: 32", time: "24:19" },
+        { note: "Block: 33", time: "24:56" },
+        { note: "Block: 34", time: "25:32" },
+        { note: "Block: 35", time: "26:01" },
+        { note: "Block: 36", time: "26:29" },
+        { note: "Block: 37", time: "27:17" },
+        { note: "Block: 38", time: "28:04" },
+        { note: "Block: 39", time: "28:35" },
+        { note: "Block: 40", time: "29:28" },
+        { note: "Concept: going slow for harder sequences", time: "30:37", concept: true },
+        { note: "Concept: use one hand at the time for harder sequences", time: "30:42", concept: true },
+        { note: "Block: 41", time: "31:21" },
+        { note: "Block: 42", time: "31:31" },
+        { note: "Block: 43", time: "31:40" },
+        { note: "Block: 44", time: "31:50" },
+        { note: "Block: 45", time: "32:00" },
+        { note: "Block: 46", time: "32:10" },
+        { note: "Block: 46", time: "32:20" },
+        { note: "Block: 48", time: "32:29" },
+        { note: "Block: 49", time: "32:39" },
+        { note: "Ending", time: "32:49" },
+      ];
+
+      const VIDEO_ID = "qpKCu5DwnaM";
+
+      function timeToSeconds(t) {
+          const parts = t.split(":").map(Number);
+          return parts.reduce((acc, val) => acc * 60 + val, 0);
+      }
+
+      const list = document.getElementById("chapters_list");
+      CHAPTERS.forEach((c, i) => {
+          const row = document.createElement("div");
+          row.className = "chapter_item" + (c.concept ? " concept" : "");
+          row.innerHTML =
+              '<span class="chapter_name">' + c.note + '</span>' +
+              '<span class="chapter_time">' + c.time + '</span>';
+          row.addEventListener("click", () => seekTo(i));
+          list.appendChild(row);
+      });
+
+      let player = null;
+      let ytReady = false;
+      window.onYouTubeIframeAPIReady = function () {
+          ytReady = true;
+          player = new YT.Player("yt-player", {
+              videoId: VIDEO_ID,
+              playerVars: { rel: 0, modestbranding: 1 },
+          });
+      };
+
+      const ytScript = document.createElement("script");
+      ytScript.src = "https://www.youtube.com/iframe_api";
+      document.head.appendChild(ytScript);
+
+      function seekTo(index) {
+          const secs = timeToSeconds(CHAPTERS[index].time);
+          if (!ytReady || !player || !player.seekTo) {
+              window.open("https://www.youtube.com/watch?v=" + VIDEO_ID + "&t=" + secs + "s", "_blank");
+              return;
+          }
+          player.seekTo(secs, true);
+          player.playVideo();
+          document.getElementById("workshop").scrollIntoView({ behavior: "smooth" });
+      }
+    </script>
+  </body>
+</html>
