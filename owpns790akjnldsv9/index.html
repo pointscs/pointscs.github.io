@@ -3,6 +3,7 @@
   <head>
     <title>POINTS - Workshop</title>
     <meta charset="utf-8">
+    <link rel="icon" href="logo.png">
     <link rel="stylesheet" href="../style.css">
     <link rel="stylesheet"
           href="https://fonts.googleapis.com/css?family=Montserrat">
@@ -12,6 +13,15 @@
       .workshop_intro {
           padding-top: 8rem;
           padding-bottom: 2rem;
+      }
+      .workshop_intro p {
+          color: white;
+      }
+      .workshop_intro a.msg_link {
+          color: white;
+      }
+      .workshop_intro a.msg_link:hover {
+          color: #e0f0f2;
       }
       .workshop_logo {
           width: 8rem;
@@ -91,12 +101,73 @@
           white-space: nowrap;
       }
 
+      .editor_bar {
+          width: 100%;
+          background-color: white;
+          padding: 1.2rem 0;
+          display: flex;
+          flex-direction: column;
+          justify-content: center;
+          align-items: center;
+      }
+      .editor_link {
+          display: flex;
+          align-items: center;
+          justify-content: flex-end;
+          width: 80%;
+          max-width: 900px;
+          padding: 0;
+          color: #90d0d5;
+          font-weight: 600;
+          font-size: 1.1rem;
+          font-family: "Montserrat", sans-serif;
+          text-decoration: none;
+          gap: 1rem;
+      }
+      .editor_text_wrapper {
+          display: flex;
+          flex-direction: column;
+          align-items: flex-end;
+      }
+      .editor_link:hover {
+          color: #90d0d5;
+          opacity: 0.8;
+      }
+      .editor_thumb {
+          height: 11rem;
+          border-radius: 0.4rem;
+          flex-shrink: 0;
+      }
+      .editor_subtext {
+          color: #90d0d5;
+          font-size: 0.9rem;
+          font-family: "Montserrat", sans-serif;
+          text-align: right;
+          margin-top: 0.3rem;
+      }
+
       @media only screen and (max-width: 950px) {
           .message_text, .chapters_container {
               width: 88%;
           }
           .video_wrapper {
               width: 92%;
+          }
+          .editor_bar {
+              padding: 1rem 4%;
+          }
+          .editor_link {
+              font-size: 0.95rem;
+              gap: 0.6rem;
+              width: 92%;
+              flex-direction: column;
+              align-items: flex-end;
+          }
+          .editor_thumb {
+              width: 95%;
+              height: auto;
+              order: -1;
+              align-self: center;
           }
       }
     </style>
@@ -122,6 +193,16 @@
                 On instagram: <a class="msg_link" href="https://www.instagram.com/points_notation/" target="_blank">@points_notation</a>
             </p>
         </div>
+    </div>
+
+    <div class="editor_bar">
+        <a href="https://pointscs.github.io/editor/" target="_blank" class="editor_link">
+            <div class="editor_text_wrapper">
+                <span>You can write down sequences using our free excel like POINTS editor: click here</span>
+                <div class="editor_subtext">And soon you'll be able to find here plenty of sequences we've written down for you to try, with friends too :)</div>
+            </div>
+            <img src="editor_screenshot.png" alt="Editor screenshot" class="editor_thumb">
+        </a>
     </div>
 
     <div class="content_container main_color_bg" id="workshop">
