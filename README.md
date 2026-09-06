@@ -1,9 +1,9 @@
-# PointsWebsite
-The single page website for POINTS.
+# Points Website
+The single page website for [POINTS](https://pointscs.github.io/).
 
 ## Properties:
 - Simple
 - Minimal
-- Stilysh
-- SPA
+- Stylish
+- Single-Page Application (SPA)
 - Accessible
