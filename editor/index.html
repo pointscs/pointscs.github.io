@@ -11,6 +11,13 @@
   <script src="https://cdn.jsdelivr.net/npm/handsontable@14.6.1/dist/handsontable.full.min.js"></script>
   <!-- xlsx-js-style — SheetJS fork with full cell-style write support -->
   <script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
+  <!-- JSZip — unzip OOXML per import diretto degli stili xlsx -->
+  <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+
+  <!-- Montserrat — font di base per tutte le scritte -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,100;1,200;1,300;1,400;1,500;1,600;1,700;1,800;1,900&display=swap" rel="stylesheet">
 
   <!-- Firebase SDK (compat v10) -->
   <script src="https://www.gstatic.com/firebasejs/10.0.0/firebase-app-compat.js"></script>
@@ -26,10 +33,14 @@
     body {
       display: flex;
       flex-direction: column;
-      font-family: 'Segoe UI', Arial, sans-serif;
+      font-family: 'Montserrat', 'Segoe UI', Arial, sans-serif;
       font-size: 13px;
       background: #f8f9fa;
       color: #222;
+    }
+    #toolbar, #toolbar .tb-btn, #toolbar .tb-select,
+    #status-bar, #file-panel, .handsontable {
+      font-family: 'Montserrat', 'Segoe UI', Arial, sans-serif;
     }
 
     /* ── App bar ──────────────────────────────────────────── */
@@ -136,6 +147,26 @@
       flex-shrink: 0;
     }
     #btn-svg:hover, #btn-png:hover { background: #1558b0; }
+
+    /* REVERT button — big red, restores the state at document open */
+    #btn-revert {
+      background: #c62828;
+      color: #fff;
+      border: none;
+      border-radius: 4px;
+      height: 28px;
+      padding: 0 16px;
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: .5px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: background .15s;
+      flex-shrink: 0;
+    }
+    #btn-revert:hover { background: #a51f1f; }
 
     /* ── Formula bar ──────────────────────────────────────── */
     /* ── Spreadsheet area ──────────────────────────────────── */
@@ -262,6 +293,22 @@
       text-align: center;
       white-space: nowrap;
       overflow: visible;
+    }
+    /* Wrapper interno: text-align sul TD viene ignorato dai browser quando il
+       testo è più largo della cella (mostrato sempre come left), e anche i
+       margini auto non sono affidabili nelle celle di tabella. Il wrapper è
+       quindi in absolute, ancorato al bordo della cella (TD position:relative
+       impostato in afterRenderer): left → bordo sx (trabocca a dx),
+       right → bordo dx (trabocca a sx), center → centrato (entrambi i lati).
+       Eredita font/colori dal TD. Le righe hanno altezza fissa, quindi
+       l'uscita dal flusso non altera il layout. */
+    .handsontable .htCore td .cell-inner {
+      position: absolute;
+      top: 50%;
+      white-space: nowrap;
+      overflow: visible;
+      max-width: none;
+      margin: 0;
     }
     .handsontable .htCore th { background: #f1f3f4; color: #555; font-weight: 600; }
 
@@ -448,21 +495,46 @@
   <button class="tb-btn" id="btn-paste" title="Paste (Ctrl+V)">&#128203;</button>
   <div class="tb-sep"></div>
 
-  <!-- Font size -->
-  <select class="tb-select" id="sel-size" style="width:54px;" title="Dimensione">
+  <!-- Dimensione testo SELEZIONATO (per-cella, non globale) -->
+  <select class="tb-select" id="sel-size" style="width:58px;" title="Dimensione del testo selezionato">
+    <option value="">Size</option>
     <option>8</option><option>9</option><option>10</option><option>11</option>
     <option>12</option><option>13</option><option>14</option>
-    <option selected>16</option><option>18</option><option>20</option><option>22</option>
+    <option>16</option><option>18</option><option>20</option><option>22</option>
     <option>24</option><option>28</option><option>32</option><option>36</option>
     <option>48</option><option>72</option>
   </select>
 
-  <!-- Text alignment -->
-  <select class="tb-select" id="sel-align" style="width:72px;" title="Allineamento">
+  <!-- Peso font Montserrat (per-cella) -->
+  <select class="tb-select" id="sel-weight" style="width:104px;" title="Peso font Montserrat del testo selezionato">
+    <option value="">Weight</option>
+    <option value="100">Thin 100</option>
+    <option value="200">X-Light 200</option>
+    <option value="300">Light 300</option>
+    <option value="400">Normal 400</option>
+    <option value="500">Medium 500</option>
+    <option value="600">SemiBold 600</option>
+    <option value="700">Bold 700</option>
+    <option value="800">X-Bold 800</option>
+    <option value="900">Black 900</option>
+  </select>
+
+  <!-- Stile testo SELEZIONATO -->
+  <button class="tb-btn" id="btn-bold" title="Grassetto selezione (Ctrl+B)" style="font-weight:700;">B</button>
+  <button class="tb-btn" id="btn-italic" title="Corsivo selezione (Ctrl+I)" style="font-style:italic;">I</button>
+  <button class="tb-btn" id="btn-underline" title="Sottolineato selezione (Ctrl+U)" style="text-decoration:underline;">U</button>
+  <button class="tb-btn" id="btn-strike" title="Barrato selezione" style="text-decoration:line-through;">S</button>
+
+  <!-- Allineamento testo SELEZIONATO -->
+  <select class="tb-select" id="sel-align" style="width:86px;" title="Allineamento del testo selezionato">
     <option value="center" selected>Center</option>
     <option value="left">Left</option>
     <option value="right">Right</option>
   </select>
+
+  <!-- Copia / incolla SOLO stile -->
+  <button class="tb-btn" id="btn-copy-style" title="Copia solo lo stile della cella attiva">🖌 Copy style</button>
+  <button class="tb-btn" id="btn-paste-style" title="Incolla solo lo stile sulla selezione" disabled>📋 Paste style</button>
 
   <!-- Color pickers -->
   <div class="color-wrap" title="Text color">
@@ -524,6 +596,7 @@
   <!-- SVG / PNG export -->
   <button id="btn-svg" title="Export selected cells as SVG">&#11015; SVG</button>
   <button id="btn-png" title="Export selected cells as PNG">&#11015; PNG</button>
+  <button id="btn-revert" title="REVERT: restore the document to the state it had when opened (from browser cache)">&#10226; REVERT</button>
 </div>
 
 <!-- ── Formula bar ──────────────────────────────────────────────────────── -->
@@ -816,10 +889,19 @@ function _applyUndoEntry(entry, captureInto) {
   captureInto.push({
     cells:   entry.cells.map(({ r, c }) => ({ r, c, value: hot.getDataAtCell(r, c) })),
     formats, borders,
+    /* Keep row/col sizes in the redo chain only for entries that carry them (revert) */
+    dims: entry.dims ? _captureDims() : undefined,
   });
   /* Restore cell values (if any) */
   if (entry.cells.length) {
     hot.setDataAtCell(entry.cells.map(({ r, c, value }) => [r, c, value ?? null]));
+  }
+  /* Restore row/col sizes (only revert entries carry them) */
+  if (entry.dims) {
+    hot.updateSettings({
+      colWidths: entry.dims.cw, rowHeights: entry.dims.rh,
+      manualColumnResize: true, manualRowResize: true,
+    });
   }
   /* Restore full style state */
   _restoreStyles(entry.formats, entry.borders);
@@ -917,8 +999,9 @@ const hot = new Handsontable(document.getElementById('sheet'), {
   afterRenderer(TD, row, col) {
     /* Always reset all inline styles so stale styles from DOM recycling don't persist */
     const fmt = cellFormats[row]?.[col];
-    TD.style.fontSize        = baseFontSize + 'px';
-    TD.style.fontWeight      = fmt?.bold      ? 'bold'   : '';
+    TD.style.fontSize        = (fmt?.fontSize || baseFontSize) + 'px';
+    /* Peso Montserrat: fontWeight numerico se presente, altrimenti fallback su bold */
+    TD.style.fontWeight      = fmt?.fontWeight ? String(fmt.fontWeight) : (fmt?.bold ? '700' : '400');
     TD.style.fontStyle       = fmt?.italic    ? 'italic' : '';
     const dec = [];
     if (fmt?.underline) dec.push('underline');
@@ -926,8 +1009,40 @@ const hot = new Handsontable(document.getElementById('sheet'), {
     TD.style.textDecoration  = dec.join(' ') || '';
     TD.style.color           = fmt?.color     || '';
     TD.style.backgroundColor = (fmt?.bgColor && fmt.bgColor !== '#ffffff') ? fmt.bgColor : '';
-    TD.style.fontFamily      = 'Arial';
-    TD.style.textAlign       = fmt?.align || 'center';
+    TD.style.fontFamily      = "'Montserrat', 'Segoe UI', Arial, sans-serif";
+    const _align = fmt?.align || 'center';
+    TD.style.textAlign       = _align;
+
+    /* ── Wrapper interno per allineamento del testo in overflow ────────────
+       text-align sul TD non ha effetto sul testo più largo della cella
+       (tutti i browser lo mostrano come left). Il wrapper in absolute viene
+       ancorato al bordo corrispondente all'allineamento, così il testo che
+       trabocca esce dal lato corretto. Idempotente: il renderer di HOT
+       resetta il contenuto a testo puro prima di ogni afterRenderer, quindi
+       il wrapper viene ricreato pulito a ogni render (niente annidamenti). */
+    TD.style.position = 'relative';
+    let _inner = (TD.firstElementChild && TD.firstElementChild.classList.contains('cell-inner'))
+      ? TD.firstElementChild : null;
+    if (!_inner && TD.textContent) {
+      const _t = TD.textContent;
+      TD.textContent = '';
+      _inner = document.createElement('div');
+      _inner.className = 'cell-inner';
+      _inner.textContent = _t;
+      TD.appendChild(_inner);
+    }
+    if (_inner) {
+      if (_align === 'left') {
+        _inner.style.left = '0'; _inner.style.right = 'auto';
+        _inner.style.transform = 'translateY(-50%)';
+      } else if (_align === 'right') {
+        _inner.style.left = 'auto'; _inner.style.right = '0';
+        _inner.style.transform = 'translateY(-50%)';
+      } else {
+        _inner.style.left = '50%'; _inner.style.right = 'auto';
+        _inner.style.transform = 'translate(-50%, -50%)';
+      }
+    }
 
     /* ── Borders via box-shadow (inset) ────────────────────────────────────
        HOT's default border-right/bottom are removed via CSS (border-collapse
@@ -979,10 +1094,20 @@ const hot = new Handsontable(document.getElementById('sheet'), {
 function syncToolbar(row, col) {
   const fmt = cellFormats[row]?.[col] || {};
 
-  document.getElementById('sel-size').value  = baseFontSize;
-  document.getElementById('sel-align').value = fmt.align      || 'center';
-  document.getElementById('inp-color').value = fmt.color      || '#000000';
-  document.getElementById('inp-bg').value    = fmt.bgColor    || '#ffffff';
+  /* Dimensione / peso / allineamento riflettono la cella attiva (selezione) */
+  document.getElementById('sel-size').value   = fmt.fontSize   || '';
+  const _w = fmt.fontWeight || (fmt.bold ? 700 : '');
+  document.getElementById('sel-weight').value = _w ? String(_w) : '';
+  document.getElementById('sel-align').value  = fmt.align      || 'center';
+  document.getElementById('inp-color').value  = fmt.color      || '#000000';
+  document.getElementById('inp-bg').value     = fmt.bgColor    || '#ffffff';
+
+  /* Stile testo selezione: evidenzia pulsanti attivi */
+  const _isBold = !!(fmt.fontWeight >= 700 || fmt.bold);
+  document.getElementById('btn-bold').classList.toggle('active', _isBold);
+  document.getElementById('btn-italic').classList.toggle('active', !!fmt.italic);
+  document.getElementById('btn-underline').classList.toggle('active', !!fmt.underline);
+  document.getElementById('btn-strike').classList.toggle('active', !!fmt.strike);
 
   /* Border buttons reflect anchor cell's current state */
   const bfmt = cellBorders[row]?.[col] || {};
@@ -1024,8 +1149,70 @@ function updateStatus() {
 /* ═══════════════════════════════════════════════════════════
    TOOLBAR WIRING
 ═══════════════════════════════════════════════════════════ */
-document.getElementById('sel-size').onchange  = (e) => { baseFontSize = parseInt(e.target.value); hot.render(); };
+/* Dimensione / peso / allineamento = SOLO testo selezionato (per-cella) */
+document.getElementById('sel-size').onchange = (e) => {
+  const v = parseInt(e.target.value);
+  if (!v) return;
+  applyFmt({ fontSize: v });
+};
+document.getElementById('sel-weight').onchange = (e) => {
+  const v = parseInt(e.target.value);
+  if (!v) return;
+  /* Tieni sincronizzato anche il flag bold per compatibilità export/shortcut */
+  applyFmt({ fontWeight: v, bold: v >= 700 });
+};
 document.getElementById('sel-align').onchange = (e) => applyFmt({ align: e.target.value });
+/* Stile testo selezionato: B / I / U / S */
+document.getElementById('btn-bold').onclick = () => {
+  const sel = hot.getSelected();
+  if (!sel || !sel.length) return;
+  const cur = getFmt(sel[0][0], sel[0][1]);
+  const curW = cur.fontWeight || (cur.bold ? 700 : 400);
+  const nextBold = !(curW >= 700 || cur.bold);
+  applyFmt({ fontWeight: nextBold ? 700 : 400, bold: nextBold });
+};
+document.getElementById('btn-italic').onclick    = () => toggleFmt('italic');
+document.getElementById('btn-underline').onclick = () => toggleFmt('underline');
+document.getElementById('btn-strike').onclick    = () => toggleFmt('strike');
+
+/* ── Copia / incolla SOLO stile (format painter) ── */
+let styleClipboard = null; /* { fmt, bfmt } copiati dalla cella attiva */
+function copyStyleOnly() {
+  const sel = hot.getSelected();
+  if (!sel || !sel.length) { showToast('Seleziona una cella da cui copiare lo stile.'); return; }
+  const [r, c] = sel[0];
+  const fmt  = cellFormats[r]?.[c] ? { ...cellFormats[r][c] } : {};
+  const bfmt = cellBorders[r]?.[c] ? { ...cellBorders[r][c] } : null;
+  /* Lo stile non include il contenuto: solo font/colori/allineamento/bordi */
+  styleClipboard = { fmt, bfmt };
+  document.getElementById('btn-paste-style').disabled = false;
+  showToast(`Stile copiato da ${cellAddr(r, c)} — seleziona le celle e premi Paste style.`);
+}
+function pasteStyleOnly() {
+  const sel = hot.getSelected();
+  if (!sel || !sel.length) return;
+  if (!styleClipboard) { showToast('Prima copia uno stile (Copy style).'); return; }
+  pushUndo();
+  for (const [r1, c1, r2, c2] of sel) {
+    for (let r = Math.min(r1, r2); r <= Math.max(r1, r2); r++) {
+      for (let c = Math.min(c1, c2); c <= Math.max(c1, c2); c++) {
+        if (!cellFormats[r]) cellFormats[r] = {};
+        if (Object.keys(styleClipboard.fmt).length) cellFormats[r][c] = { ...styleClipboard.fmt };
+        else delete cellFormats[r][c];
+        if (!cellBorders[r]) cellBorders[r] = {};
+        if (styleClipboard.bfmt) cellBorders[r][c] = { ...styleClipboard.bfmt };
+        else delete cellBorders[r][c];
+      }
+    }
+  }
+  _isDirty = true;
+  hot.render();
+  const s = hot.getSelected();
+  if (s && s.length) syncToolbar(s[0][0], s[0][1]);
+  showToast('Stile incollato.');
+}
+document.getElementById('btn-copy-style').onclick  = copyStyleOnly;
+document.getElementById('btn-paste-style').onclick = pasteStyleOnly;
 document.getElementById('inp-color').oninput     = (e) => applyFmt({ color: e.target.value });
 document.getElementById('inp-bg').oninput        = (e) => applyFmt({ bgColor: e.target.value });
 
@@ -1249,8 +1436,8 @@ function buildSvg(rMin, rMax, cMin, cMax) {
 
       const fmt = cellFormats[r]?.[c] || {};
       const fg  = fmt.color    || '#222222';
-      const fs  = baseFontSize;
-      const fw  = fmt.bold     ? 'bold'   : 'normal';
+      const fs  = fmt.fontSize || baseFontSize;
+      const fw  = fmt.fontWeight ? String(fmt.fontWeight) : (fmt.bold ? '700' : '400');
       const fi  = fmt.italic   ? 'italic' : 'normal';
       const decParts = [];
       if (fmt.underline) decParts.push('underline');
@@ -1275,7 +1462,7 @@ function buildSvg(rMin, rMax, cMin, cMax) {
                      : 'middle';
         body +=
           `<text x="${tx}" y="${yOff + CH / 2}" ` +
-          `font-family="Arial, sans-serif" ` +
+          `font-family="Montserrat, Arial, sans-serif" ` +
           `font-size="${fs}" font-weight="${fw}" font-style="${fi}" ` +
           `text-decoration="${deco}" fill="${fg}" ` +
           `text-anchor="${anchor}" dominant-baseline="middle"` +
@@ -1655,9 +1842,10 @@ function exportXLSX() {
 
       const s = {};
 
-      /* Font */
-      const font = { name: 'Arial' };
-      if (fmt.bold)      font.bold      = true;
+      /* Font — base Montserrat, peso numerico per-cella */
+      const _w = fmt.fontWeight || (fmt.bold ? 700 : 400);
+      const font = { name: 'Montserrat', sz: fmt.fontSize || baseFontSize };
+      if (_w >= 700) font.bold = true;
       if (fmt.italic)    font.italic    = true;
       if (fmt.underline) font.underline = true;
       if (fmt.strike)    font.strike    = true;
@@ -1696,7 +1884,7 @@ function exportXLSX() {
 }
 
 /* ── .wsheet loader (shared by file import and auto-load) ── */
-async function loadWSheetText(text, name) {
+async function loadWSheetText(text, name, opts = {}) {
   const state = JSON.parse(text);
   if (!state || state.version !== 1) throw new Error('Invalid format');
 
@@ -1762,7 +1950,98 @@ async function loadWSheetText(text, name) {
   _isDirty = false;
   document.getElementById('st-msg').textContent = '';
   if (name) { setSheetName(name); showToast(`Opened: ${name}`); }
+  /* Snapshot the just-opened state as revert baseline (skipped by REVERT itself) */
+  if (opts.baseline !== false) saveBaseline(name);
 }
+
+/* ═══════════════════════════════════════════════════════════
+   DOCUMENT BASELINE SNAPSHOT + REVERT
+   Every time a document is opened, a full snapshot (same shape as
+   .wsheet: data + formats + borders + col widths + row heights) is saved
+   to localStorage — the browser cache. (Cookies are unsuitable: ~4KB max
+   each and sent with every request; localStorage holds ~5MB locally.)
+   The red REVERT button restores that exact "state at open".
+   Revert itself is undoable (values + styles + row/col sizes).
+═══════════════════════════════════════════════════════════ */
+const BASELINE_KEY = 'points-editor-baseline-v1';
+
+function saveBaseline(name) {
+  try {
+    const label = name || document.getElementById('sheet-name').textContent || 'template';
+    localStorage.setItem(BASELINE_KEY, JSON.stringify({
+      name: label, savedAt: Date.now(), state: _buildState(),
+    }));
+  } catch (err) {
+    console.warn('Baseline snapshot failed:', err);
+  }
+}
+
+function getBaseline() {
+  try {
+    const raw = localStorage.getItem(BASELINE_KEY);
+    if (!raw) return null;
+    const b = JSON.parse(raw);
+    if (!b || !b.state || b.state.version !== 1) return null;
+    return b;
+  } catch { return null; }
+}
+
+/* Dense column-width / row-height arrays, for full undo of a revert */
+function _captureDims() {
+  const nC = hot.countCols(), nR = hot.countRows();
+  const cw = new Array(nC), rh = new Array(nR);
+  for (let c = 0; c < nC; c++) { try { cw[c] = hot.getColWidth(c) || cellSize; } catch { cw[c] = cellSize; } }
+  for (let r = 0; r < nR; r++) {
+    let h;
+    try { h = hot.getRowHeight(r); } catch {}
+    if (!h) { const td = hot.getCell(r, 0); h = td?.parentElement?.offsetHeight || 0; }
+    rh[r] = h || cellSize;
+  }
+  return { cw, rh };
+}
+
+/* Content bounds = union of current grid + optional extra state (so undo
+   of a revert also covers cells the baseline adds beyond current bounds) */
+function _contentBounds(extra) {
+  const raw = hot.getData();
+  let lastRow = 0, lastCol = 0;
+  for (let r = 0; r < raw.length; r++)
+    for (let c = 0; c < (raw[r]?.length || 0); c++)
+      if (raw[r][c] !== null && raw[r][c] !== '' && raw[r][c] !== undefined) {
+        lastRow = Math.max(lastRow, r); lastCol = Math.max(lastCol, c);
+      }
+  const stores = [cellFormats, cellBorders];
+  if (extra) stores.push(extra.formats || {}, extra.borders || {});
+  for (const s of stores)
+    for (const r of Object.keys(s)) {
+      lastRow = Math.max(lastRow, +r);
+      for (const c of Object.keys(s[r])) lastCol = Math.max(lastCol, +c);
+    }
+  if (extra && extra.data) {
+    lastRow = Math.max(lastRow, extra.data.length - 1);
+    extra.data.forEach(row => { if (row) lastCol = Math.max(lastCol, row.length - 1); });
+  }
+  return { lastRow, lastCol };
+}
+
+async function revertToBaseline() {
+  const b = getBaseline();
+  if (!b) { showToast('No baseline snapshot — open a document first.'); return; }
+  const when = b.savedAt ? new Date(b.savedAt).toLocaleString() : '';
+  if (!confirm(`REVERT to the state at open?\n\n"${b.name}" — saved ${when}\n\nCurrent changes will be replaced (you can undo with Ctrl+Z).`)) return;
+  /* Capture current state so the revert itself is undoable */
+  const { lastRow, lastCol } = _contentBounds(b.state);
+  const cells = [];
+  for (let r = 0; r <= lastRow; r++)
+    for (let c = 0; c <= lastCol; c++)
+      cells.push({ r, c, value: hot.getDataAtCell(r, c) });
+  pushUndo(cells);
+  undoStack[undoStack.length - 1].dims = _captureDims();
+  _isDirty = true;
+  await loadWSheetText(JSON.stringify(b.state), b.name, { baseline: false });
+  showToast(`Reverted to state at open: ${b.name}`);
+}
+document.getElementById('btn-revert').onclick = revertToBaseline;
 
 /* ═══════════════════════════════════════════════════════════
    GOOGLE SHEETS HTML IMPORT
@@ -1897,11 +2176,202 @@ function handleGoogleSheetsHtml(file) {
       setSheetName(file.name);
       const borderTotal = Object.values(newBorders).reduce((n, cols) => n + Object.keys(cols).length, 0);
       showToast(`Opened: ${file.name} (${aoa.length} rows, ${borderTotal} bordered cells)`);
+      saveBaseline(file.name);
     } catch (err) {
       showToast(`Error: ${err.message}`);
     }
   };
   reader.readAsText(file, 'utf-8');
+}
+
+/* ═══════════════════════════════════════════════════════════
+   OOXML STYLE IMPORT (.xlsx / .xlsm)
+   I reader SheetJS-family mappano gli stili in lettura in modo
+   inaffidabile (font/allineamenti/bordi persi, fill fuori posto), quindi
+   gli stili sono parsati direttamente dal pacchetto OOXML con JSZip:
+   xl/styles.xml + lo sheet XML. Tollerante come Excel: si usano gli id
+   dell'xf così come sono (flag apply* ignorati), tag minimi supportati
+   (niente <sz>, <b val="1"/> ok). .xls (BIFF) e .ods restano al
+   best-effort SheetJS del ramo sopra.
+═══════════════════════════════════════════════════════════ */
+
+/* Standard indexed palette (fallback quando styles.xml non dichiara indexedColors) */
+const _indexedStd = ('000000,ffffff,ff0000,00ff00,0000ff,ffff00,ff00ff,00ffff,' +
+  '000000,ffffff,ff0000,00ff00,0000ff,ffff00,ff00ff,00ffff,' +
+  '800000,008000,000080,808000,800080,008080,c0c0c0,808080,' +
+  '9999ff,993366,ffffcc,ccffff,660066,ff8080,0066cc,ccccff,' +
+  '000080,ff00ff,ffff00,00ffff,800080,800000,008080,0000ff,' +
+  '00ccff,ccffff,ccffcc,ffff99,99ccff,ff99cc,cc99ff,ffcc99,' +
+  '3366ff,33cccc,99cc00,ffcc00,ff9900,ff6600,666699,969696,' +
+  '003366,339966,003300,333300,993300,993366,333399,333333').split(',');
+
+/* Applica tint (-1..1) a un colore rrggbb */
+function _applyTint(hex, tint) {
+  const t = parseFloat(tint) || 0;
+  if (!t) return hex.toLowerCase();
+  const ch = [0, 2, 4].map(i => {
+    const c = parseInt(hex.substr(i, 2), 16);
+    const v = t < 0 ? c * (1 + t) : c * (1 - t) + 255 * t;
+    return Math.max(0, Math.min(255, Math.round(v))).toString(16).padStart(2, '0');
+  });
+  return ch.join('');
+}
+
+/* Risolve <color rgb|theme|indexed|auto> in #rrggbb (minuscolo) o null */
+function _resolveColor(node, theme, indexed) {
+  if (!node) return null;
+  if (node.hasAttribute('rgb')) return '#' + node.getAttribute('rgb').slice(-6).toLowerCase();
+  if (node.hasAttribute('theme')) {
+    const t = theme[+node.getAttribute('theme')];
+    if (!t) return null;
+    return '#' + _applyTint(t, node.getAttribute('tint') || 0);
+  }
+  if (node.hasAttribute('indexed')) {
+    const i = +node.getAttribute('indexed');
+    const c = (indexed && indexed[i]) || _indexedStd[i];
+    return c ? '#' + c.toLowerCase() : null;
+  }
+  return null;
+}
+
+async function importOoxmlCellStyles(file, wb) {
+  try {
+    if (typeof JSZip === 'undefined') return;
+    const ln = file.name.toLowerCase();
+    if (!(ln.endsWith('.xlsx') || ln.endsWith('.xlsm'))) return;
+    const zip = await JSZip.loadAsync(file);
+    const parser = new DOMParser();
+    const loadXml = async (p) => {
+      const f = zip.file(p);
+      if (!f) return null;
+      const doc = parser.parseFromString(await f.async('string'), 'application/xml');
+      return doc.getElementsByTagName('parsererror').length ? null : doc;
+    };
+    const tag = (doc, name) =>
+      doc.getElementsByTagName('a:' + name)[0] || doc.getElementsByTagName(name)[0];
+
+    /* Trova il file dello sheet attivo (primo foglio) via workbook + rels */
+    const wbDoc = await loadXml('xl/workbook.xml');
+    const wbRels = await loadXml('xl/_rels/workbook.xml.rels');
+    let sheetPath = 'xl/worksheets/sheet1.xml';
+    if (wbDoc && wbRels) {
+      const sheets = [...wbDoc.getElementsByTagName('sheet')];
+      const idx = Math.max(0, sheets.findIndex(s => s.getAttribute('name') === wb.SheetNames[0]));
+      const rid = sheets[idx] && (sheets[idx].getAttribute('r:id') || sheets[idx].getAttribute('id'));
+      if (rid) {
+        const rel = [...wbRels.getElementsByTagName('Relationship')].find(r => r.getAttribute('Id') === rid);
+        const tgt = rel && rel.getAttribute('Target');
+        if (tgt) sheetPath = (/^(xl\/|\/)/.test(tgt)) ? tgt.replace(/^\//, '') : 'xl/' + tgt;
+      }
+    }
+
+    const [stylesDoc, sheetDoc, themeDoc] = await Promise.all([
+      loadXml('xl/styles.xml'), loadXml(sheetPath), loadXml('xl/theme/theme1.xml'),
+    ]);
+    if (!stylesDoc || !sheetDoc) return;
+
+    /* Theme colors 0..9 = lt1,dk1,lt2,dk2,accent1..6 */
+    const theme = [];
+    const clrScheme = themeDoc && (tag(themeDoc, 'clrScheme'));
+    if (clrScheme) {
+      for (const el of clrScheme.children) {
+        const srgb = tag(el, 'srgbClr'), sys = tag(el, 'sysClr');
+        theme.push((srgb && srgb.getAttribute('val')) || (sys && sys.getAttribute('lastClr')) || null);
+      }
+    }
+    /* Indexed colors: override dal file, altrimenti palette standard */
+    let indexed = null;
+    const idxEl = stylesDoc.getElementsByTagName('indexedColors')[0];
+    if (idxEl) indexed = [...idxEl.getElementsByTagName('rgbColor')].map(e => e.getAttribute('rgb').slice(-6));
+
+    const fonts = [...stylesDoc.getElementsByTagName('font')];
+    const fills = [...stylesDoc.getElementsByTagName('fill')];
+    const borders = [...stylesDoc.getElementsByTagName('border')];
+    const xfsEl = stylesDoc.getElementsByTagName('cellXfs')[0];
+    const xfs = xfsEl ? [...xfsEl.getElementsByTagName('xf')] : [];
+    if (!xfs.length) return;
+
+    /* Flag presente (qualsiasi forma: <b/>, <b val="1"/>) e non negato */
+    const truthy = (parent, name) => {
+      const n = parent.getElementsByTagName(name)[0];
+      if (!n) return false;
+      const v = n.getAttribute('val');
+      return v === null || (v !== '0' && v.toLowerCase() !== 'false');
+    };
+
+    for (const c of sheetDoc.getElementsByTagName('c')) {
+      const sAttr = c.getAttribute('s');
+      if (sAttr === null || sAttr === '') continue;
+      const xf = xfs[+sAttr];
+      if (!xf) continue;
+      const m = /^([A-Z]+)(\d+)$/.exec(c.getAttribute('r') || '');
+      if (!m) continue;
+      let col = 0;
+      for (const ch of m[1]) col = col * 26 + (ch.charCodeAt(0) - 64);
+      col -= 1;
+      const row = parseInt(m[2], 10) - 1;
+
+      const fmt = {}, brd = {};
+
+      /* Font */
+      const font = fonts[+(xf.getAttribute('fontId') || 0)];
+      if (font) {
+        if (truthy(font, 'b')) { fmt.bold = true; fmt.fontWeight = 700; }
+        if (truthy(font, 'i')) fmt.italic = true;
+        const u = font.getElementsByTagName('u')[0];
+        if (u) {
+          const uv = u.getAttribute('val');
+          if (uv === null || uv.toLowerCase() !== 'none') fmt.underline = true;
+        }
+        if (truthy(font, 'strike')) fmt.strike = true;
+        const fc = _resolveColor(font.getElementsByTagName('color')[0], theme, indexed);
+        if (fc && fc !== '#000000') fmt.color = fc;
+        const sz = font.getElementsByTagName('sz')[0];
+        const szv = sz && parseFloat(sz.getAttribute('val'));
+        if (szv && szv >= 6 && szv <= 200) fmt.fontSize = Math.round(szv);
+      }
+
+      /* Fill (solo solid con fgColor reale) */
+      const fill = fills[+(xf.getAttribute('fillId') || 0)];
+      const pf = fill && fill.getElementsByTagName('patternFill')[0];
+      if (pf && pf.getAttribute('patternType') === 'solid') {
+        const fg = _resolveColor(
+          pf.getElementsByTagName('fgColor')[0] || pf.getElementsByTagName('bgColor')[0], theme, indexed);
+        if (fg && fg !== '#ffffff' && fg !== '#000000') fmt.bgColor = fg;
+      }
+
+      /* Allineamento orizzontale */
+      const al = xf.getElementsByTagName('alignment')[0];
+      const ah = al && al.getAttribute('horizontal');
+      if (ah === 'left' || ah === 'center' || ah === 'right') fmt.align = ah;
+      else if (ah === 'centerContinuous') fmt.align = 'center';
+
+      /* Bordi (ogni lato con style reale) */
+      const border = borders[+(xf.getAttribute('borderId') || 0)];
+      if (border) {
+        const side = (name) => {
+          const n = border.getElementsByTagName(name)[0];
+          if (!n) return null;
+          const st = n.getAttribute('style');
+          if (!st || st.toLowerCase() === 'none') return null;
+          return _resolveColor(n.getElementsByTagName('color')[0], theme, indexed) || '#000000';
+        };
+        const bt = side('top'), br = side('right'), bb = side('bottom'), bl = side('left');
+        if (bt || br || bb || bl) { brd.top = bt; brd.right = br; brd.bottom = bb; brd.left = bl; }
+      }
+
+      if (Object.keys(fmt).length) {
+        if (!cellFormats[row]) cellFormats[row] = {};
+        cellFormats[row][col] = { ...(cellFormats[row][col] || {}), ...fmt };
+      }
+      if (Object.keys(brd).length) {
+        if (!cellBorders[row]) cellBorders[row] = {};
+        cellBorders[row][col] = { ...(cellBorders[row][col] || {}), ...brd };
+      }
+    }
+  } catch (err) {
+    console.warn('OOXML style import skipped:', err);
+  }
 }
 
 /* ── Import: detect format and load ── */
@@ -1923,9 +2393,10 @@ function handleFileImport(file) {
     reader.readAsText(file);
 
   } else {
-    /* ── xlsx / ods / csv / xls: SheetJS ── */
+    /* ── xlsx / ods / csv / xls: valori e dimensioni via SheetJS;
+          stili xlsx/xlsm via parsing OOXML diretto (vedi importOoxmlCellStyles) ── */
     const reader = new FileReader();
-    reader.onload = (e) => {
+    reader.onload = async (e) => {
       try {
         const data = new Uint8Array(e.target.result);
         const wb   = XLSX.read(data, { type: 'array', cellStyles: true });
@@ -1953,12 +2424,13 @@ function handleFileImport(file) {
               const fmt = {};
               const brd = {};
 
-              /* Font */
+              /* Font — importata in Montserrat con peso/dimensione per-cella */
               if (s.font) {
-                if (s.font.bold)      fmt.bold      = true;
+                if (s.font.bold)      { fmt.bold = true; fmt.fontWeight = 700; }
                 if (s.font.italic)    fmt.italic    = true;
                 if (s.font.underline) fmt.underline = true;
                 if (s.font.strike)    fmt.strike    = true;
+                if (s.font.sz && s.font.sz >= 6 && s.font.sz <= 200) fmt.fontSize = Math.round(s.font.sz);
                 const fc = fromRgb(s.font.color?.rgb);
                 if (fc && fc !== '#000000') fmt.color = fc;
               }
@@ -2006,9 +2478,13 @@ function handleFileImport(file) {
         });
         hot.updateSettings({ colWidths: cwArr, rowHeights: rhArr, manualColumnResize: true, manualRowResize: true });
 
+        /* Stili per xlsx/xlsm: parsing OOXML diretto (sovrascrive il best-effort SheetJS) */
+        await importOoxmlCellStyles(file, wb);
+
         hot.render();
         setSheetName(file.name);
         showToast(`Opened: ${file.name} (${wb.SheetNames[0]})`);
+        saveBaseline(file.name);
       } catch (err) {
         showToast(`Error reading file: ${err.message}`);
       }
