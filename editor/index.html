@@ -1004,6 +1004,23 @@ let gridVisible  = true;
 let cellSize     = 36;
 let baseFontSize = 16; /* scales with cellSize */
 
+/* Griglia minima sempre disponibile, qualunque file venga aperto:
+   colonne da A fino ad AZ (26 + 26 = 52) e almeno 400 righe. */
+const GRID_MIN_COLS = 52;
+const GRID_MIN_ROWS = 400;
+
+/* Porta una matrice di celle alla griglia minima senza toccare i dati.
+   Le righe/colonne vuote in eccesso vengono poi tolte in fase di salvataggio. */
+function padToMinGrid(src) {
+  const rows = [];
+  for (let r = 0; r < Math.max(src.length, GRID_MIN_ROWS); r++) {
+    const row = src[r] ? [...src[r]] : [];
+    while (row.length < GRID_MIN_COLS) row.push('');
+    rows.push(row);
+  }
+  return rows;
+}
+
 /* ═══════════════════════════════════════════════════════════
    AUTO-STYLE RUNNER (attivo quando il pannello "dev mode" è chiuso)
    Ad ogni scrittura in una cella il contenuto viene classificato e la
@@ -1184,7 +1201,7 @@ function performRedo() {
    HANDSONTABLE
 ═══════════════════════════════════════════════════════════ */
 const hot = new Handsontable(document.getElementById('sheet'), {
-  data: Handsontable.helper.createEmptySpreadsheetData(400, 50),
+  data: Handsontable.helper.createEmptySpreadsheetData(GRID_MIN_ROWS, GRID_MIN_COLS),
   rowHeaders: true,
   colHeaders: true,
   contextMenu: {
@@ -2431,18 +2448,11 @@ async function loadWSheetText(text, name, opts = {}) {
   Object.keys(cellFormats).forEach(k => delete cellFormats[k]);
   Object.keys(cellBorders).forEach(k => delete cellBorders[k]);
 
-  /* Load data — always pad to at least 400 rows × 50 cols so the grid
-     never appears smaller than the default. Trailing empty rows/cols are
-     stripped again by _buildState when saving, so nothing extra is persisted. */
-  const MIN_ROWS = 400, MIN_COLS = 50;
-  const src = state.data || [];
-  const padded = [];
-  for (let r = 0; r < Math.max(src.length, MIN_ROWS); r++) {
-    const row = src[r] ? [...src[r]] : [];
-    while (row.length < MIN_COLS) row.push('');
-    padded.push(row);
-  }
-  hot.loadData(padded);
+  /* Load data — sempre pad fino a GRID_MIN_ROWS × GRID_MIN_COLS (A..AZ): la griglia
+     non appare mai più stretta del default, anche se il file ha meno colonne.
+     Righe/colonne vuote in eccesso sono tolte di nuovo in fase di salvataggio
+     (_buildState), quindi non viene salvato nulla di superfluo. */
+  hot.loadData(padToMinGrid(state.data || []));
 
   /* Restore formatting */
   if (state.formats) {
@@ -2703,7 +2713,7 @@ function handleGoogleSheetsHtml(file) {
       /* 3 ── Load into Handsontable */
       Object.keys(cellFormats).forEach(k => delete cellFormats[k]);
       Object.keys(cellBorders).forEach(k => delete cellBorders[k]);
-      hot.loadData(aoa);
+      hot.loadData(padToMinGrid(aoa));
 
       for (const [r, cols] of Object.entries(newFormats)) {
         if (!cellFormats[r]) cellFormats[r] = {};
@@ -2951,7 +2961,8 @@ function handleFileImport(file) {
         Object.keys(cellFormats).forEach(k => delete cellFormats[k]);
         Object.keys(cellBorders).forEach(k => delete cellBorders[k]);
 
-        hot.loadData(aoa);
+        /* Sempre pad ad A..AZ × 400 righe, anche se il file è più piccolo */
+        hot.loadData(padToMinGrid(aoa));
 
         /* ARGB/RGB hex from xlsx → internal #rrggbb */
         const fromRgb = (rgb) => rgb ? '#' + rgb.slice(-6).toLowerCase() : null;
