@@ -405,9 +405,6 @@
     .tb-btn.active .bord-ico.b { border-bottom-color: #1a73e8; }
     .tb-btn.active .bord-ico.l { border-left-color:   #1a73e8; }
     .tb-btn.active .bord-ico.a { border-color:        #1a73e8; }
-    /* Smart borders: stessa icona di "All borders" ma colore diverso */
-    .bord-ico.smart { border-color: #e8710a; }
-    .tb-btn.active .bord-ico.smart { border-color: #e8710a; }
 
     /* ── Grid hide ────────────────────────────────────────── */
     /* Grid visibility is handled in afterRenderer via inline styles
@@ -608,7 +605,6 @@
   <button class="tb-btn" id="btn-bord-t" title="Top border">        <span class="bord-ico t"></span></button>
   <button class="tb-btn" id="btn-bord-b" title="Bottom border">     <span class="bord-ico b"></span></button>
   <button class="tb-btn" id="btn-bord-a" title="All borders">       <span class="bord-ico a"></span></button>
-  <button class="tb-btn" id="btn-bord-smart" title="Smart borders: only the perimeter of the selection"><span class="bord-ico a smart"></span></button>
   <button class="tb-btn" id="btn-clear-fmt" title="Clear formatting"><span class="bord-ico"></span></button>
 
   <div class="tb-sep"></div>
@@ -867,7 +863,6 @@
     <button data-side="top"    title="Top border"    onclick="toggleBorder('top')">   <span class="bord-ico t"></span></button>
     <button data-side="bottom" title="Bottom border" onclick="toggleBorder('bottom')"><span class="bord-ico b"></span></button>
     <button id="bp-outer"      title="All borders"   onclick="document.getElementById('btn-bord-a').click()"><span class="bord-ico a"></span></button>
-    <button id="bp-smart"      title="Smart borders (perimeter)" onclick="document.getElementById('btn-bord-smart').click()"><span class="bord-ico a smart"></span></button>
     <button id="bp-clear-fmt"  title="Clear formatting" onclick="document.getElementById('btn-clear-fmt').click()"><span class="bord-ico"></span></button>
   </div>
   <div class="bp-row-sep"></div>
@@ -2107,33 +2102,12 @@ document.getElementById('btn-bord-l').onclick = () => toggleBorder('left');
 document.getElementById('btn-bord-b').onclick = () => toggleBorder('bottom');
 document.getElementById('btn-bord-r').onclick = () => toggleBorder('right');
 
-/* All borders: boxes EVERY cell of each selected area (full inner grid). */
-document.getElementById('btn-bord-a').onclick = () => {
-  const sel = hot.getSelected();
-  if (!sel || !sel.length) return;
-  pushUndo();
-  for (const [r1, c1, r2, c2] of sel) {
-    const rMin = Math.min(r1, r2), rMax = Math.max(r1, r2);
-    const cMin = Math.min(c1, c2), cMax = Math.max(c1, c2);
-    for (let r = rMin; r <= rMax; r++) {
-      for (let c = cMin; c <= cMax; c++) {
-        const b = getBordFmt(r, c);
-        b.top = _bordColor; b.bottom = _bordColor;
-        b.left = _bordColor; b.right = _bordColor;
-      }
-    }
-  }
-  _isDirty = true;
-  hot.render();
-  syncToolbar(sel[0][0], sel[0][1]);
-};
-
-/* Smart borders: draws a border ONLY on the outer boundary of the union of
-   all selected cells. Works for any shape (rectangles, L/T shapes, multiple
+/* All borders: draws a border ONLY on the outer boundary of the union of all
+   selected cells. Works for any shape (rectangles, L/T shapes, multiple
    disjoint areas): a side is drawn only when the neighbouring cell in that
    direction is NOT selected. Inner edges never get a line, so a 3x3 square
    is "8 boxes" and an L shape follows its own contour (notch included). */
-document.getElementById('btn-bord-smart').onclick = () => {
+document.getElementById('btn-bord-a').onclick = () => {
   const sel = hot.getSelected();
   if (!sel || !sel.length) return;
   pushUndo();
