@@ -580,7 +580,7 @@
 
   <!-- Grid visibility toggle -->
   <button class="tb-btn active" id="btn-grid" title="Show/hide grid">&#9783; Grid</button>
-  <button class="tb-btn" id="btn-style-tab" title="dev mode: pannello avanzato di stile. Con il pannello aperto il runner automatico (maiuscole 18/medium, numeri 16, altro 16 a destra) è disattivato e i parametri si modificano a mano.">&#9656; dev mode</button>
+  <button class="tb-btn" id="btn-style-tab" title="dev mode: pannello avanzato di stile. Con il pannello aperto il runner automatico è disattivato: il testo non viene corretto (left/right → Left/Right, lettera singola minuscola → MAIUSCOLA) e gli stili (maiuscole 18/medium, numeri 16, altro 16 a destra) si impostano a mano.">&#9656; dev mode</button>
 
   <!-- Sheet name (centered) -->
   <div style="flex:1; min-width:8px;"></div>
@@ -992,15 +992,18 @@ function padToMinGrid(src) {
 
 /* ═══════════════════════════════════════════════════════════
    AUTO-STYLE RUNNER (attivo quando il pannello "dev mode" è chiuso)
-   Ad ogni scrittura in una cella il contenuto viene classificato e la
-   cella riceve automaticamente dimensione/peso/allineamento:
+   Ad ogni scrittura in una cella il TESTO viene corretto e poi la cella
+   riceve automaticamente dimensione/peso/allineamento:
+     • "left" / "right" (qualsiasi caso) → "Left" / "Right"
+     • una SINGOLA lettera minuscola (a…z) → MAIUSCOLA (così eredita lo
+       stile delle lettere)
      • LETTERE MAIUSCOLE (A, B, ABC…) → 18px, grassetto medio 500, centrato
      • NUMERI (1, 2, 3.5…)            → 16px, peso normale 400, centrato
      • "Left" / "Right"               → 16px, a destra e spostate di 0,5rem
                                         dal bordo destro della cella
      • QUALSIASI ALTRO TESTO          → 16px, peso normale 400, a destra
-   Con "dev mode" aperto il runner è disattivato: i parametri si
-   modificano a mano (controlli per selezione e tab globale).
+   Con "dev mode" aperto il runner è disattivato: testo e parametri
+   restano esattamente come scritti/del documento.
 ═══════════════════════════════════════════════════════════ */
 let devMode = false;
 const AUTO_STYLE_KEYS = ['fontSize', 'fontWeight', 'bold', 'align', 'padRight'];
@@ -1018,6 +1021,26 @@ function _autoStyleFor(value) {
   if (/^(left|right)$/i.test(s))                         /* "Left"/"Right" */
     return { fontSize: 16, fontWeight: 400, bold: false, align: 'right', padRight: WORDS_PAD_RIGHT };
   return { fontSize: 16, fontWeight: 400, bold: false, align: 'right', padRight: 0 };
+}
+
+/* Correzione del TESTO da scrivere in cella (solo con dev mode chiuso).
+   Ritorna la stringa corretta, oppure null se il testo va lasciato com'è:
+     • "left"/"right" in qualsiasi combinazione di maiuscole → "Left"/"Right"
+     • una singola lettera minuscola ("a") → "A"
+   Il resto non viene toccato. */
+function _autoValueFor(value) {
+  if (value === null || value === undefined) return null;
+  const raw = String(value);
+  if (!raw) return null;
+
+  const s = raw.trim();
+  if (/^(left|right)$/i.test(s)) {                          /* Left / Right */
+    const canon = s.charAt(0).toUpperCase() + s.slice(1).toLowerCase();
+    return canon === raw ? null : canon;
+  }
+  if (/^[a-zà-öø-ÿ]$/.test(raw)) return raw.toUpperCase();  /* lettera singola */
+
+  return null;
 }
 
 /* Applica (o rimuove, se la cella è vuota) i parametri auto alla cella.
@@ -1054,22 +1077,32 @@ function runAutoStyle(changes) {
   return changed;
 }
 
-/* Normalizza con il runner TUTTO il contenuto già presente nella griglia.
+/* Normalizza con il runner TUTTO il contenuto già presente nella griglia:
+   corregge il testo ("left"→"Left", "a"→"A") e riapplica gli stili.
    Usato all'apertura di un documento (file, template, cloud…). Con dev mode
-   aperto non fa nulla: gli stili restano quelli del documento.
+   aperto non fa nulla: testo e stili restano quelli del documento.
    Ritorna il numero di celle riadattate. */
 function normalizeAutoStyles() {
   if (devMode) return 0;
   const data = hot.getData();
+  const textFixes = [];
   let n = 0;
   for (let r = 0; r < data.length; r++) {
     const row = data[r] || [];
     for (let c = 0; c < row.length; c++) {
       const v = row[c];
       if (v === null || v === undefined || v === '') continue;
+      const fix = _autoValueFor(v);
+      if (fix !== null) {            /* testo da correggere: la scrittura qui
+                                        sotto fa applicare lo stile dal runner */
+        textFixes.push([r, c, fix]);
+        n++;
+        continue;
+      }
       if (_applyAutoStyle(r, c, v)) n++;
     }
   }
+  if (textFixes.length) hot.setDataAtCell(textFixes, 'autostyle');
   return n;
 }
 
@@ -1324,7 +1357,17 @@ const hot = new Handsontable(document.getElementById('sheet'), {
   },
 
   beforeChange(changes, source) {
-    if (_undoing || source !== 'edit') return;
+    if (_undoing) return;
+    /* Correzione del testo in ingresso (digitazione, paste, fill…):
+       "left"/"right" → "Left"/"Right", lettera minuscola singola → MAIUSCOLA.
+       Con dev mode aperto il testo resta esattamente come digitato. */
+    if (!devMode && source !== 'loadData') {
+      for (const ch of changes) {
+        const fix = _autoValueFor(ch[3]);
+        if (fix !== null) ch[3] = fix;
+      }
+    }
+    if (source !== 'edit') return;
     pushUndo(changes.map(([r, c, oldVal]) => ({ r, c, value: oldVal })));
   },
 
