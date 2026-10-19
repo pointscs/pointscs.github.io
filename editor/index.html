@@ -189,6 +189,16 @@
       font-family: 'Montserrat', 'Segoe UI', Arial, sans-serif;
     }
     #style-tab.hidden { display: none; }
+    #dev-mode-note {
+      font-size: 11px;
+      font-weight: 700;
+      color: #e8710a;
+      text-transform: uppercase;
+      letter-spacing: .4px;
+      padding-right: 10px;
+      border-right: 1px solid #e0e0e0;
+      flex-shrink: 0;
+    }
     .style-group {
       display: flex;
       align-items: center;
@@ -613,7 +623,7 @@
   <button class="tb-btn active" id="btn-grid" title="Show/hide grid">&#9783; Grid</button>
   <button class="tb-btn" id="btn-grid-minus" title="Decrease cell size" style="font-size:16px; padding:0 9px;">−</button>
   <button class="tb-btn" id="btn-grid-plus"  title="Increase cell size" style="font-size:16px; padding:0 9px;">+</button>
-  <button class="tb-btn" id="btn-style-tab" title="dev mode: open/close the advanced text-style panel">&#9656; dev mode</button>
+  <button class="tb-btn" id="btn-style-tab" title="dev mode: pannello avanzato di stile. Con il pannello aperto il runner automatico (maiuscole 18/medium, numeri 16, altro 16 a destra) è disattivato e i parametri si modificano a mano.">&#9656; dev mode</button>
 
   <!-- Sheet name (centered) -->
   <div style="flex:1; min-width:8px;"></div>
@@ -643,6 +653,7 @@
 
 <!-- ── Global text-style tab (whole sheet, by content category — collapsible) -->
 <div id="style-tab" class="hidden">
+  <span id="dev-mode-note" title="Con dev mode aperto il runner automatico è disattivato">dev mode · runner automatico OFF</span>
   <div class="style-group" data-group="numbers">
     <span class="style-group-title" title="Applies to ALL cells with numeric content (whole sheet)">123 Numbers</span>
     <select class="tb-select" id="gnum-size" style="width:58px;" title="Dimensione di tutti i numeri">
@@ -994,6 +1005,59 @@ let cellSize     = 36;
 let baseFontSize = 16; /* scales with cellSize */
 
 /* ═══════════════════════════════════════════════════════════
+   AUTO-STYLE RUNNER (attivo quando il pannello "dev mode" è chiuso)
+   Ad ogni scrittura in una cella il contenuto viene classificato e la
+   cella riceve automaticamente dimensione/peso/allineamento:
+     • LETTERE MAIUSCOLE (A, B, ABC…) → 18px, grassetto medio 500, centrato
+     • NUMERI (1, 2, 3.5…)            → 16px, peso normale 400, centrato
+     • QUALSIASI ALTRO TESTO          → 16px, peso normale 400, a destra
+   Con "dev mode" aperto il runner è disattivato: i parametri si
+   modificano a mano (controlli per selezione e tab globale).
+═══════════════════════════════════════════════════════════ */
+let devMode = false;
+const AUTO_STYLE_KEYS = ['fontSize', 'fontWeight', 'bold', 'align'];
+
+function _autoStyleFor(value) {
+  const s = (value === null || value === undefined) ? '' : String(value).trim();
+  if (!s) return null;                                   /* cella vuota */
+  if (/^[A-ZÀ-ÖØ-Þ]+$/.test(s))                          /* solo maiuscole */
+    return { fontSize: 18, fontWeight: 500, bold: false, align: 'center' };
+  if (/^[+-]?\d+([.,]\d+)?$/.test(s))                    /* solo un numero */
+    return { fontSize: 16, fontWeight: 400, bold: false, align: 'center' };
+  return { fontSize: 16, fontWeight: 400, bold: false, align: 'right' };
+}
+
+/* Applica (o rimuove, se la cella è vuota) i parametri auto alla cella.
+   Ritorna true se qualcosa è cambiato. */
+function _applyAutoStyle(r, c, value) {
+  const spec = _autoStyleFor(value);
+  const cur  = cellFormats[r]?.[c];
+  if (!spec) {
+    if (!cur) return false;
+    let changed = false;
+    for (const k of AUTO_STYLE_KEYS) if (k in cur) { delete cur[k]; changed = true; }
+    if (changed && !Object.keys(cur).length) delete cellFormats[r][c];
+    return changed;
+  }
+  if (cur && AUTO_STYLE_KEYS.every(k => cur[k] === spec[k])) return false;
+  if (!cellFormats[r]) cellFormats[r] = {};
+  cellFormats[r][c] = Object.assign({}, cur || {}, spec);
+  return true;
+}
+
+/* Runner: richiamato dal afterChange per ogni cella scritta */
+function runAutoStyle(changes) {
+  if (devMode || !changes) return false;
+  let changed = false;
+  for (const ch of changes) {
+    const r = ch[0], c = ch[1];
+    if (typeof r !== 'number' || typeof c !== 'number' || r < 0 || c < 0) continue;
+    if (_applyAutoStyle(r, c, ch[3])) changed = true;
+  }
+  return changed;
+}
+
+/* ═══════════════════════════════════════════════════════════
    UNDO / REDO STACKS
    Each entry: { cells: [{r,c,value}], formats: {}, borders: {} }
    • cells   = old VALUES of cells whose content changed ([] for style-only ops)
@@ -1250,10 +1314,13 @@ const hot = new Handsontable(document.getElementById('sheet'), {
   afterCreateCol(index, amount) { _shiftColsInStores(index, amount); },
   afterRemoveCol(index, amount) { _shiftColsInStores(index, -amount); },
 
-  afterChange(changes) {
+  afterChange(changes, source) {
     if (!changes) return;
     _isDirty = true;
     updateStatus();
+    /* Auto-style runner: formatta ogni cella scritta (no su caricamento file,
+       così gli stili degli xlsx importati restano intatti). */
+    if (source !== 'loadData' && runAutoStyle(changes)) hot.render();
   },
 });
 
@@ -1620,6 +1687,7 @@ function resetGlobalTab() {
 const _styleTab = document.getElementById('style-tab');
 const _btnStyleTab = document.getElementById('btn-style-tab');
 function setStyleTab(open) {
+  devMode = !!open;   /* con dev mode aperto il runner automatico è disattivato */
   _styleTab.classList.toggle('hidden', !open);
   _btnStyleTab.classList.toggle('active', open);
   _btnStyleTab.innerHTML = (open ? '&#9662;' : '&#9656;') + ' dev mode';
