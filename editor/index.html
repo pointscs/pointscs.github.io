@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>POINTS — Sequences Editor</title>
+  <title>POINTS editor</title>
   <link rel="icon" type="image/png" href="src/logo.png">
 
   <!-- Handsontable Community Edition -->
@@ -56,7 +56,14 @@
       box-shadow: 0 2px 4px rgba(0,0,0,.18);
       z-index: 10;
     }
-    #app-logo-img { height: 30px; flex-shrink: 0; }
+    #app-title {
+      font-size: 17px;
+      font-weight: 700;
+      letter-spacing: .3px;
+      color: #fff;
+      flex-shrink: 0;
+      white-space: nowrap;
+    }
     #sheet-name {
       font-size: 13px;
       font-weight: 500;
@@ -167,6 +174,36 @@
       flex-shrink: 0;
     }
     #btn-revert:hover { background: #a51f1f; }
+
+    /* ── Global text-style tab (collapsible, below toolbar) ─────────── */
+    #style-tab {
+      background: #fff;
+      border-bottom: 1px solid #e0e0e0;
+      padding: 4px 10px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-shrink: 0;
+      flex-wrap: wrap;
+      min-height: 38px;
+      font-family: 'Montserrat', 'Segoe UI', Arial, sans-serif;
+    }
+    #style-tab.hidden { display: none; }
+    .style-group {
+      display: flex;
+      align-items: center;
+      gap: 3px;
+      padding: 2px 10px 2px 0;
+      border-right: 1px solid #e0e0e0;
+    }
+    .style-group:last-child { border-right: none; }
+    .style-group-title {
+      font-size: 12px;
+      font-weight: 700;
+      color: #555;
+      margin-right: 4px;
+      white-space: nowrap;
+    }
 
     /* ── Formula bar ──────────────────────────────────────── */
     /* ── Spreadsheet area ──────────────────────────────────── */
@@ -358,6 +395,9 @@
     .tb-btn.active .bord-ico.b { border-bottom-color: #1a73e8; }
     .tb-btn.active .bord-ico.l { border-left-color:   #1a73e8; }
     .tb-btn.active .bord-ico.a { border-color:        #1a73e8; }
+    /* Smart borders: stessa icona di "All borders" ma colore diverso */
+    .bord-ico.smart { border-color: #e8710a; }
+    .tb-btn.active .bord-ico.smart { border-color: #e8710a; }
 
     /* ── Grid hide ────────────────────────────────────────── */
     /* Grid visibility is handled in afterRenderer via inline styles
@@ -471,7 +511,7 @@
 
 <!-- ── App bar ──────────────────────────────────────────────────────────── -->
 <div id="app-bar">
-  <img id="app-logo-img" src="src/logo_text.png" alt="POINTS">
+  <span id="app-title">POINTS editor</span>
 
   <!-- Auth area -->
   <div id="auth-area">
@@ -533,8 +573,8 @@
   </select>
 
   <!-- Copia / incolla SOLO stile -->
-  <button class="tb-btn" id="btn-copy-style" title="Copia solo lo stile della cella attiva">🖌 Copy style</button>
-  <button class="tb-btn" id="btn-paste-style" title="Incolla solo lo stile sulla selezione" disabled>📋 Paste style</button>
+  <button class="tb-btn" id="btn-copy-style" title="Copia lo stile di TUTTE le celle selezionate (mantiene la disposizione)">🖌 Copy style</button>
+  <button class="tb-btn" id="btn-paste-style" title="Incolla lo stile sulla selezione (matrice relativa, ripetuta se serve)" disabled>📋 Paste style</button>
 
   <!-- Color pickers -->
   <div class="color-wrap" title="Text color">
@@ -558,6 +598,7 @@
   <button class="tb-btn" id="btn-bord-t" title="Top border">        <span class="bord-ico t"></span></button>
   <button class="tb-btn" id="btn-bord-b" title="Bottom border">     <span class="bord-ico b"></span></button>
   <button class="tb-btn" id="btn-bord-a" title="All borders">       <span class="bord-ico a"></span></button>
+  <button class="tb-btn" id="btn-bord-smart" title="Smart borders: only the perimeter of the selection"><span class="bord-ico a smart"></span></button>
   <button class="tb-btn" id="btn-clear-fmt" title="Clear formatting"><span class="bord-ico"></span></button>
 
   <div class="tb-sep"></div>
@@ -572,6 +613,7 @@
   <button class="tb-btn active" id="btn-grid" title="Show/hide grid">&#9783; Grid</button>
   <button class="tb-btn" id="btn-grid-minus" title="Decrease cell size" style="font-size:16px; padding:0 9px;">−</button>
   <button class="tb-btn" id="btn-grid-plus"  title="Increase cell size" style="font-size:16px; padding:0 9px;">+</button>
+  <button class="tb-btn" id="btn-style-tab" title="dev mode: open/close the advanced text-style panel">&#9656; dev mode</button>
 
   <!-- Sheet name (centered) -->
   <div style="flex:1; min-width:8px;"></div>
@@ -597,6 +639,135 @@
   <button id="btn-svg" title="Export selected cells as SVG">&#11015; SVG</button>
   <button id="btn-png" title="Export selected cells as PNG">&#11015; PNG</button>
   <button id="btn-revert" title="REVERT: restore the document to the state it had when opened (from browser cache)">&#10226; REVERT</button>
+</div>
+
+<!-- ── Global text-style tab (whole sheet, by content category — collapsible) -->
+<div id="style-tab" class="hidden">
+  <div class="style-group" data-group="numbers">
+    <span class="style-group-title" title="Applies to ALL cells with numeric content (whole sheet)">123 Numbers</span>
+    <select class="tb-select" id="gnum-size" style="width:58px;" title="Dimensione di tutti i numeri">
+      <option value="" selected>Size</option>
+      <option>8</option><option>9</option><option>10</option><option>11</option>
+      <option>12</option><option>13</option><option>14</option>
+      <option>16</option><option>18</option><option>20</option><option>22</option>
+      <option>24</option><option>28</option><option>32</option><option>36</option>
+      <option>48</option><option>72</option>
+    </select>
+    <select class="tb-select" id="gnum-weight" style="width:104px;" title="Peso font di tutti i numeri">
+      <option value="" selected>Weight</option>
+      <option value="100">Thin 100</option>
+      <option value="200">X-Light 200</option>
+      <option value="300">Light 300</option>
+      <option value="400">Normal 400</option>
+      <option value="500">Medium 500</option>
+      <option value="600">SemiBold 600</option>
+      <option value="700">Bold 700</option>
+      <option value="800">X-Bold 800</option>
+      <option value="900">Black 900</option>
+    </select>
+    <button class="tb-btn" id="gnum-bold" title="Grassetto per tutti i numeri" style="font-weight:700;">B</button>
+    <button class="tb-btn" id="gnum-italic" title="Corsivo per tutti i numeri" style="font-style:italic;">I</button>
+    <button class="tb-btn" id="gnum-underline" title="Sottolineato per tutti i numeri" style="text-decoration:underline;">U</button>
+    <button class="tb-btn" id="gnum-strike" title="Barrato per tutti i numeri" style="text-decoration:line-through;">S</button>
+    <select class="tb-select" id="gnum-align" style="width:86px;" title="Allineamento di tutti i numeri">
+      <option value="" selected>Align</option>
+      <option value="left">Left</option>
+      <option value="center">Center</option>
+      <option value="right">Right</option>
+    </select>
+    <div class="color-wrap" title="Colore testo di tutti i numeri">
+      <span class="color-label">A</span>
+      <input type="color" class="color-swatch" id="gnum-color" value="#000000">
+    </div>
+    <div class="color-wrap" title="Sfondo di tutti i numeri" style="margin-left:4px;">
+      <span class="color-label" style="font-size:12px;">&#9608;</span>
+      <input type="color" class="color-swatch" id="gnum-bg" value="#ffffff">
+    </div>
+  </div>
+
+  <div class="style-group" data-group="letters">
+    <span class="style-group-title" title="Applies to ALL cells with letters only (whole sheet)">ABC Letters</span>
+    <select class="tb-select" id="gabc-size" style="width:58px;" title="Dimensione di tutte le lettere">
+      <option value="" selected>Size</option>
+      <option>8</option><option>9</option><option>10</option><option>11</option>
+      <option>12</option><option>13</option><option>14</option>
+      <option>16</option><option>18</option><option>20</option><option>22</option>
+      <option>24</option><option>28</option><option>32</option><option>36</option>
+      <option>48</option><option>72</option>
+    </select>
+    <select class="tb-select" id="gabc-weight" style="width:104px;" title="Peso font di tutte le lettere">
+      <option value="" selected>Weight</option>
+      <option value="100">Thin 100</option>
+      <option value="200">X-Light 200</option>
+      <option value="300">Light 300</option>
+      <option value="400">Normal 400</option>
+      <option value="500">Medium 500</option>
+      <option value="600">SemiBold 600</option>
+      <option value="700">Bold 700</option>
+      <option value="800">X-Bold 800</option>
+      <option value="900">Black 900</option>
+    </select>
+    <button class="tb-btn" id="gabc-bold" title="Grassetto per tutte le lettere" style="font-weight:700;">B</button>
+    <button class="tb-btn" id="gabc-italic" title="Corsivo per tutte le lettere" style="font-style:italic;">I</button>
+    <button class="tb-btn" id="gabc-underline" title="Sottolineato per tutte le lettere" style="text-decoration:underline;">U</button>
+    <button class="tb-btn" id="gabc-strike" title="Barrato per tutte le lettere" style="text-decoration:line-through;">S</button>
+    <select class="tb-select" id="gabc-align" style="width:86px;" title="Allineamento di tutte le lettere">
+      <option value="" selected>Align</option>
+      <option value="left">Left</option>
+      <option value="center">Center</option>
+      <option value="right">Right</option>
+    </select>
+    <div class="color-wrap" title="Colore testo di tutte le lettere">
+      <span class="color-label">A</span>
+      <input type="color" class="color-swatch" id="gabc-color" value="#000000">
+    </div>
+    <div class="color-wrap" title="Sfondo di tutte le lettere" style="margin-left:4px;">
+      <span class="color-label" style="font-size:12px;">&#9608;</span>
+      <input type="color" class="color-swatch" id="gabc-bg" value="#ffffff">
+    </div>
+  </div>
+
+  <div class="style-group" data-group="words">
+    <span class="style-group-title" title='Applies to ALL cells containing exactly "Left" or "Right" (whole sheet)'>Left/Right</span>
+    <select class="tb-select" id="gwr-size" style="width:58px;" title="Dimensione di tutte le celle Left/Right">
+      <option value="" selected>Size</option>
+      <option>8</option><option>9</option><option>10</option><option>11</option>
+      <option>12</option><option>13</option><option>14</option>
+      <option>16</option><option>18</option><option>20</option><option>22</option>
+      <option>24</option><option>28</option><option>32</option><option>36</option>
+      <option>48</option><option>72</option>
+    </select>
+    <select class="tb-select" id="gwr-weight" style="width:104px;" title="Peso font di tutte le celle Left/Right">
+      <option value="" selected>Weight</option>
+      <option value="100">Thin 100</option>
+      <option value="200">X-Light 200</option>
+      <option value="300">Light 300</option>
+      <option value="400">Normal 400</option>
+      <option value="500">Medium 500</option>
+      <option value="600">SemiBold 600</option>
+      <option value="700">Bold 700</option>
+      <option value="800">X-Bold 800</option>
+      <option value="900">Black 900</option>
+    </select>
+    <button class="tb-btn" id="gwr-bold" title="Grassetto per tutte le celle Left/Right" style="font-weight:700;">B</button>
+    <button class="tb-btn" id="gwr-italic" title="Corsivo per tutte le celle Left/Right" style="font-style:italic;">I</button>
+    <button class="tb-btn" id="gwr-underline" title="Sottolineato per tutte le celle Left/Right" style="text-decoration:underline;">U</button>
+    <button class="tb-btn" id="gwr-strike" title="Barrato per tutte le celle Left/Right" style="text-decoration:line-through;">S</button>
+    <select class="tb-select" id="gwr-align" style="width:86px;" title="Allineamento di tutte le celle Left/Right">
+      <option value="" selected>Align</option>
+      <option value="left">Left</option>
+      <option value="center">Center</option>
+      <option value="right">Right</option>
+    </select>
+    <div class="color-wrap" title="Colore testo di tutte le celle Left/Right">
+      <span class="color-label">A</span>
+      <input type="color" class="color-swatch" id="gwr-color" value="#000000">
+    </div>
+    <div class="color-wrap" title="Sfondo di tutte le celle Left/Right" style="margin-left:4px;">
+      <span class="color-label" style="font-size:12px;">&#9608;</span>
+      <input type="color" class="color-swatch" id="gwr-bg" value="#ffffff">
+    </div>
+  </div>
 </div>
 
 <!-- ── Formula bar ──────────────────────────────────────────────────────── -->
@@ -685,6 +856,7 @@
     <button data-side="top"    title="Top border"    onclick="toggleBorder('top')">   <span class="bord-ico t"></span></button>
     <button data-side="bottom" title="Bottom border" onclick="toggleBorder('bottom')"><span class="bord-ico b"></span></button>
     <button id="bp-outer"      title="All borders"   onclick="document.getElementById('btn-bord-a').click()"><span class="bord-ico a"></span></button>
+    <button id="bp-smart"      title="Smart borders (perimeter)" onclick="document.getElementById('btn-bord-smart').click()"><span class="bord-ico a smart"></span></button>
     <button id="bp-clear-fmt"  title="Clear formatting" onclick="document.getElementById('btn-clear-fmt').click()"><span class="bord-ico"></span></button>
   </div>
   <div class="bp-row-sep"></div>
@@ -1086,6 +1258,59 @@ const hot = new Handsontable(document.getElementById('sheet'), {
 });
 
 /* ═══════════════════════════════════════════════════════════
+   MANUAL RESIZE WITHOUT MINIMUM (columns + rows)
+   HOT hard-clamps mouse-drag sizes inside the resize plugins'
+   private setManualSize (20px columns / 23px rows). We override it
+   (min 2px so handles stay grabbable and hit-testing stays sane) and
+   serve our sizes through modify* hooks registered AFTER the plugins'
+   (order 3 > plugin orders 1–2 — last non-undefined return wins).
+   Programmatic size changes (file load, grid +/-, revert) go through
+   updateSettings, which clears the drag overrides via
+   afterUpdateSettings so loaded/default sizes always apply.
+═══════════════════════════════════════════════════════════ */
+const RESIZE_MIN_PX = 2;
+const dragColW = new Map(); /* physical col -> width */
+const dragRowH = new Map(); /* physical row -> height */
+
+function patchManualResize() {
+  const colP = hot.getPlugin('manualColumnResize');
+  if (colP && !colP._noMinPatch) {
+    colP.setManualSize = (column, width) => {
+      const w = Math.max(RESIZE_MIN_PX, Math.round(width));
+      dragColW.set(hot.toPhysicalColumn(column), w);
+      try { colP.clearManualSize(column); } catch {}
+      return w;
+    };
+    colP._noMinPatch = true;
+  }
+  const rowP = hot.getPlugin('manualRowResize');
+  if (rowP && !rowP._noMinPatch) {
+    rowP.setManualSize = (row, height) => {
+      const h = Math.max(RESIZE_MIN_PX, Math.round(height));
+      dragRowH.set(hot.toPhysicalRow(row), h);
+      try { rowP.clearManualSize(row); } catch {}
+      return h;
+    };
+    rowP._noMinPatch = true;
+  }
+}
+patchManualResize();
+
+hot.addHook('modifyColWidth', (width, col) => {
+  const v = dragColW.get(hot.toPhysicalColumn(col));
+  return v !== undefined ? v : undefined;
+}, 3);
+hot.addHook('modifyRowHeight', (height, row) => {
+  const v = dragRowH.get(hot.toPhysicalRow(row));
+  return v !== undefined ? v : undefined;
+}, 3);
+hot.addHook('afterUpdateSettings', () => {
+  dragColW.clear();
+  dragRowH.clear();
+  patchManualResize(); /* re-apply if a plugin was ever re-created */
+});
+
+/* ═══════════════════════════════════════════════════════════
    FORMULA BAR
 ═══════════════════════════════════════════════════════════ */
 /* ═══════════════════════════════════════════════════════════
@@ -1175,36 +1400,71 @@ document.getElementById('btn-italic').onclick    = () => toggleFmt('italic');
 document.getElementById('btn-underline').onclick = () => toggleFmt('underline');
 document.getElementById('btn-strike').onclick    = () => toggleFmt('strike');
 
-/* ── Copia / incolla SOLO stile (format painter) ── */
-let styleClipboard = null; /* { fmt, bfmt } copiati dalla cella attiva */
-function copyStyleOnly() {
+/* ── Copia / incolla SOLO stile (format painter) ──
+   Copia lo stile di TUTTE le celle selezionate conservando la loro
+   disposizione relativa. Al paste la matrice di stili viene mappata su
+   ogni area selezionata (e ripetuta a piastrelle se l'area di
+   destinazione è più grande della sorgente). */
+let styleClipboard = null; /* { blocks: [{ rows, cols, fmts, bords }] } */
+
+function _normRanges() {
   const sel = hot.getSelected();
-  if (!sel || !sel.length) { showToast('Seleziona una cella da cui copiare lo stile.'); return; }
-  const [r, c] = sel[0];
-  const fmt  = cellFormats[r]?.[c] ? { ...cellFormats[r][c] } : {};
-  const bfmt = cellBorders[r]?.[c] ? { ...cellBorders[r][c] } : null;
-  /* Lo stile non include il contenuto: solo font/colori/allineamento/bordi */
-  styleClipboard = { fmt, bfmt };
-  document.getElementById('btn-paste-style').disabled = false;
-  showToast(`Stile copiato da ${cellAddr(r, c)} — seleziona le celle e premi Paste style.`);
+  if (!sel || !sel.length) return [];
+  return sel.map(([r1, c1, r2, c2]) => ({
+    rMin: Math.min(r1, r2), rMax: Math.max(r1, r2),
+    cMin: Math.min(c1, c2), cMax: Math.max(c1, c2),
+  }));
 }
+
+function _copyFmtAt(r, c) {
+  const f = cellFormats[r]?.[c];
+  return (f && Object.keys(f).length) ? { ...f } : null;
+}
+function _copyBordAt(r, c) {
+  const b = cellBorders[r]?.[c];
+  return (b && Object.keys(b).length) ? { ...b } : null;
+}
+
+function copyStyleOnly() {
+  const ranges = _normRanges();
+  if (!ranges.length) { showToast('Seleziona una cella da cui copiare lo stile.'); return; }
+  const blocks = ranges.map(({ rMin, rMax, cMin, cMax }) => {
+    const fmts = [], bords = [];
+    for (let r = rMin; r <= rMax; r++) {
+      const fr = [], br = [];
+      for (let c = cMin; c <= cMax; c++) { fr.push(_copyFmtAt(r, c)); br.push(_copyBordAt(r, c)); }
+      fmts.push(fr); bords.push(br);
+    }
+    return { rows: rMax - rMin + 1, cols: cMax - cMin + 1, fmts, bords };
+  });
+  styleClipboard = { blocks };
+  document.getElementById('btn-paste-style').disabled = false;
+  const n = blocks.reduce((a, b) => a + b.rows * b.cols, 0);
+  showToast(`Stile copiato da ${n} cella${n === 1 ? '' : 'e'} — seleziona le celle e premi Paste style.`);
+}
+
 function pasteStyleOnly() {
-  const sel = hot.getSelected();
-  if (!sel || !sel.length) return;
-  if (!styleClipboard) { showToast('Prima copia uno stile (Copy style).'); return; }
+  if (!styleClipboard || !styleClipboard.blocks.length) { showToast('Prima copia uno stile (Copy style).'); return; }
+  const ranges = _normRanges();
+  if (!ranges.length) return;
   pushUndo();
-  for (const [r1, c1, r2, c2] of sel) {
-    for (let r = Math.min(r1, r2); r <= Math.max(r1, r2); r++) {
-      for (let c = Math.min(c1, c2); c <= Math.max(c1, c2); c++) {
+  const blocks = styleClipboard.blocks;
+  ranges.forEach(({ rMin, rMax, cMin, cMax }, bi) => {
+    /* più aree selezionate che aree copiate → ripeti la sorgente */
+    const blk = blocks[bi % blocks.length];
+    for (let r = rMin; r <= rMax; r++) {
+      for (let c = cMin; c <= cMax; c++) {
+        const fmt  = blk.fmts[(r - rMin) % blk.rows][(c - cMin) % blk.cols];
+        const bord = blk.bords[(r - rMin) % blk.rows][(c - cMin) % blk.cols];
         if (!cellFormats[r]) cellFormats[r] = {};
-        if (Object.keys(styleClipboard.fmt).length) cellFormats[r][c] = { ...styleClipboard.fmt };
+        if (fmt) cellFormats[r][c] = { ...fmt };
         else delete cellFormats[r][c];
         if (!cellBorders[r]) cellBorders[r] = {};
-        if (styleClipboard.bfmt) cellBorders[r][c] = { ...styleClipboard.bfmt };
+        if (bord) cellBorders[r][c] = { ...bord };
         else delete cellBorders[r][c];
       }
     }
-  }
+  });
   _isDirty = true;
   hot.render();
   const s = hot.getSelected();
@@ -1215,6 +1475,133 @@ document.getElementById('btn-copy-style').onclick  = copyStyleOnly;
 document.getElementById('btn-paste-style').onclick = pasteStyleOnly;
 document.getElementById('inp-color').oninput     = (e) => applyFmt({ color: e.target.value });
 document.getElementById('inp-bg').oninput        = (e) => applyFmt({ bgColor: e.target.value });
+
+/* ═══════════════════════════════════════════════════════════
+   GLOBAL TEXT-STYLE PROFILES (whole sheet, by content category)
+   Three copies of the text controls, each applied sheet-wide to its
+   own category (NOT to the selection):
+   • numbers — cells with numeric content (1, 2, 3.5…)
+   • letters — cells with letters only (A, B, C…)
+   • words   — cells containing exactly "Left" or "Right" (checked first,
+                since those words are also letters-only)
+   Application is a batch write into cellFormats (undoable, saved,
+   exported like any other formatting). New values typed afterwards keep
+   the default style — re-click the control to restyle the category.
+═══════════════════════════════════════════════════════════ */
+const GLOBAL_GROUPS = ['numbers', 'letters', 'words'];
+const _gprefix = { numbers: 'gnum', letters: 'gabc', words: 'gwr' };
+const _glabel  = { numbers: 'Numbers', letters: 'Letters', words: 'Left/Right' };
+
+function _cellCategory(value) {
+  if (value === null || value === undefined) return null;
+  const s = String(value).trim();
+  if (!s) return null;
+  if (/^(left|right)$/i.test(s)) return 'words';
+  if (!isNaN(Number(s))) return 'numbers';
+  if (/^[A-Za-zÀ-ÖØ-öø-ÿ]+$/.test(s)) return 'letters';
+  return null;
+}
+
+function _matchingCells(key) {
+  const out = [];
+  for (let r = 0, nr = hot.countRows(); r < nr; r++)
+    for (let c = 0, nc = hot.countCols(); c < nc; c++)
+      if (_cellCategory(hot.getDataAtCell(r, c)) === key) out.push([r, c]);
+  return out;
+}
+
+function _fmtOf(r, c) { return cellFormats[r]?.[c] || {}; }
+
+function applyGlobal(key, props) {
+  const cells = _matchingCells(key);
+  if (!cells.length) { showToast(`No ${_glabel[key]} cells found.`); return 0; }
+  pushUndo();
+  for (const [r, c] of cells) Object.assign(getFmt(r, c), props);
+  _isDirty = true;
+  hot.render();
+  const s = hot.getSelected();
+  if (s && s.length) syncToolbar(s[0][0], s[0][1]);
+  return cells.length;
+}
+
+function toggleGlobal(key, prop) {
+  const cells = _matchingCells(key);
+  if (!cells.length) { showToast(`No ${_glabel[key]} cells found.`); return; }
+  /* Se almeno una cella non ce l'ha → accendi a tutte, altrimenti spegni */
+  const anyOff = cells.some(([r, c]) => {
+    const f = _fmtOf(r, c);
+    return prop === 'bold' ? !(f.fontWeight >= 700 || f.bold) : !f[prop];
+  });
+  const props = prop === 'bold'
+    ? { fontWeight: anyOff ? 700 : 400, bold: anyOff }
+    : { [prop]: anyOff };
+  pushUndo();
+  for (const [r, c] of cells) Object.assign(getFmt(r, c), props);
+  _isDirty = true;
+  hot.render();
+  document.getElementById(_gprefix[key] + '-' + prop).classList.toggle('active', anyOff);
+  showToast(`${_glabel[key]} ${prop} ${anyOff ? 'ON' : 'OFF'} — ${cells.length} cells.`);
+}
+
+function wireGlobalGroup(key) {
+  const gid = (n) => document.getElementById(_gprefix[key] + '-' + n);
+  gid('size').onchange = (e) => {
+    const v = parseInt(e.target.value);
+    if (!v) return;
+    const n = applyGlobal(key, { fontSize: v });
+    if (n) showToast(`${_glabel[key]} size ${v} — ${n} cells.`);
+  };
+  gid('weight').onchange = (e) => {
+    const v = parseInt(e.target.value);
+    if (!v) return;
+    const n = applyGlobal(key, { fontWeight: v, bold: v >= 700 });
+    if (n) showToast(`${_glabel[key]} weight ${v} — ${n} cells.`);
+  };
+  gid('align').onchange = (e) => {
+    if (!e.target.value) return;
+    const n = applyGlobal(key, { align: e.target.value });
+    if (n) showToast(`${_glabel[key]} align ${e.target.value} — ${n} cells.`);
+  };
+  for (const prop of ['bold', 'italic', 'underline', 'strike'])
+    gid(prop).onclick = () => toggleGlobal(key, prop);
+  /* 'change' (non 'input'): un solo undo per scelta colore */
+  gid('color').onchange = (e) => {
+    const n = applyGlobal(key, { color: e.target.value });
+    if (n) showToast(`${_glabel[key]} color — ${n} cells.`);
+  };
+  gid('bg').onchange = (e) => {
+    const n = applyGlobal(key, { bgColor: e.target.value });
+    if (n) showToast(`${_glabel[key]} background — ${n} cells.`);
+  };
+}
+GLOBAL_GROUPS.forEach(wireGlobalGroup);
+
+/* Reset tab UI all'apertura di un documento (i preset sono per-sessione) */
+function resetGlobalTab() {
+  for (const key of GLOBAL_GROUPS) {
+    const p = _gprefix[key];
+    document.getElementById(p + '-size').value = '';
+    document.getElementById(p + '-weight').value = '';
+    document.getElementById(p + '-align').value = '';
+    document.getElementById(p + '-color').value = '#000000';
+    document.getElementById(p + '-bg').value = '#ffffff';
+    for (const prop of ['bold', 'italic', 'underline', 'strike'])
+      document.getElementById(p + '-' + prop).classList.remove('active');
+  }
+}
+
+/* ── Dev-mode panel (global text-style tab) ── */
+const _styleTab = document.getElementById('style-tab');
+const _btnStyleTab = document.getElementById('btn-style-tab');
+function setStyleTab(open) {
+  _styleTab.classList.toggle('hidden', !open);
+  _btnStyleTab.classList.toggle('active', open);
+  _btnStyleTab.innerHTML = (open ? '&#9662;' : '&#9656;') + ' dev mode';
+  try { localStorage.setItem('points-styletab-open', open ? '1' : '0'); } catch {}
+  hot.refreshDimensions();
+}
+_btnStyleTab.onclick = () => setStyleTab(_styleTab.classList.contains('hidden'));
+try { setStyleTab(localStorage.getItem('points-styletab-open') === '1'); } catch { setStyleTab(false); }
 
 let _bordColor = '#000000';
 document.getElementById('inp-bord-color').oninput = (e) => { _bordColor = e.target.value; };
@@ -1584,29 +1971,46 @@ document.getElementById('btn-bord-l').onclick = () => toggleBorder('left');
 document.getElementById('btn-bord-b').onclick = () => toggleBorder('bottom');
 document.getElementById('btn-bord-r').onclick = () => toggleBorder('right');
 
-/* Outer border: draws a border only on the perimeter of the selection box,
-   leaving inner cells untouched. */
+/* All borders: boxes EVERY cell of each selected area (full inner grid). */
 document.getElementById('btn-bord-a').onclick = () => {
   const sel = hot.getSelected();
   if (!sel || !sel.length) return;
   pushUndo();
-
-  /* Compute the overall bounding box across all selection areas */
-  let rMin = Infinity, rMax = -Infinity, cMin = Infinity, cMax = -Infinity;
   for (const [r1, c1, r2, c2] of sel) {
-    rMin = Math.min(rMin, r1, r2); rMax = Math.max(rMax, r1, r2);
-    cMin = Math.min(cMin, c1, c2); cMax = Math.max(cMax, c1, c2);
+    const rMin = Math.min(r1, r2), rMax = Math.max(r1, r2);
+    const cMin = Math.min(c1, c2), cMax = Math.max(c1, c2);
+    for (let r = rMin; r <= rMax; r++) {
+      for (let c = cMin; c <= cMax; c++) {
+        const b = getBordFmt(r, c);
+        b.top = _bordColor; b.bottom = _bordColor;
+        b.left = _bordColor; b.right = _bordColor;
+      }
+    }
   }
+  _isDirty = true;
+  hot.render();
+  syncToolbar(sel[0][0], sel[0][1]);
+};
 
-  for (let r = rMin; r <= rMax; r++) {
-    for (let c = cMin; c <= cMax; c++) {
-      const onEdge = r === rMin || r === rMax || c === cMin || c === cMax;
-      if (!onEdge) continue;
-      const b = getBordFmt(r, c);
-      if (r === rMin) b.top    = _bordColor;
-      if (r === rMax) b.bottom = _bordColor;
-      if (c === cMin) b.left   = _bordColor;
-      if (c === cMax) b.right  = _bordColor;
+/* Smart borders: draws a border only on the perimeter of each selected area,
+   leaving inner cells untouched (perimeter of a 3x3 selection = 8 boxes). */
+document.getElementById('btn-bord-smart').onclick = () => {
+  const sel = hot.getSelected();
+  if (!sel || !sel.length) return;
+  pushUndo();
+  for (const [r1, c1, r2, c2] of sel) {
+    const rMin = Math.min(r1, r2), rMax = Math.max(r1, r2);
+    const cMin = Math.min(c1, c2), cMax = Math.max(c1, c2);
+    for (let r = rMin; r <= rMax; r++) {
+      for (let c = cMin; c <= cMax; c++) {
+        const onEdge = r === rMin || r === rMax || c === cMin || c === cMax;
+        if (!onEdge) continue;
+        const b = getBordFmt(r, c);
+        if (r === rMin) b.top    = _bordColor;
+        if (r === rMax) b.bottom = _bordColor;
+        if (c === cMin) b.left   = _bordColor;
+        if (c === cMax) b.right  = _bordColor;
+      }
     }
   }
   _isDirty = true;
@@ -1952,6 +2356,7 @@ async function loadWSheetText(text, name, opts = {}) {
   if (name) { setSheetName(name); showToast(`Opened: ${name}`); }
   /* Snapshot the just-opened state as revert baseline (skipped by REVERT itself) */
   if (opts.baseline !== false) saveBaseline(name);
+  resetGlobalTab();
 }
 
 /* ═══════════════════════════════════════════════════════════
@@ -2177,6 +2582,7 @@ function handleGoogleSheetsHtml(file) {
       const borderTotal = Object.values(newBorders).reduce((n, cols) => n + Object.keys(cols).length, 0);
       showToast(`Opened: ${file.name} (${aoa.length} rows, ${borderTotal} bordered cells)`);
       saveBaseline(file.name);
+      resetGlobalTab();
     } catch (err) {
       showToast(`Error: ${err.message}`);
     }
@@ -2485,6 +2891,7 @@ function handleFileImport(file) {
         setSheetName(file.name);
         showToast(`Opened: ${file.name} (${wb.SheetNames[0]})`);
         saveBaseline(file.name);
+        resetGlobalTab();
       } catch (err) {
         showToast(`Error reading file: ${err.message}`);
       }
