@@ -1400,17 +1400,26 @@ const hot = new Handsontable(document.getElementById('sheet'), {
        HOT's default border-right/bottom are removed via CSS (border-collapse
        collapse is preserved for correct hit-testing).  With 0-width CSS
        borders, cells are effectively pixel-adjacent, so inset box-shadows
-       drawn at each cell's edge produce a gap-free continuous line.         */
+       drawn at each cell's edge produce a gap-free continuous line.
+       BORDO CONDIVISO: fra due celle il lato è UNA sola linea. La disegna la
+       cella di sinistra/sopra (dove passerebbe anche la griglia): se la
+       vicina ha il bordo opposto, il suo viene ignorato — altrimenti le due
+       ombre finiscono in due colonne di pixel adiacenti e la linea sembra
+       spessa il doppio. La griglia segue la stessa regola.                  */
     const b  = cellBorders[row]?.[col] || {};
+    const bR = cellBorders[row]?.[col + 1] || {};      /* vicino a destra   */
+    const bB = cellBorders[row + 1]?.[col] || {};      /* vicino sotto      */
+    const bL = cellBorders[row]?.[col - 1] || {};      /* vicino a sinistra */
+    const bT = cellBorders[row - 1]?.[col] || {};      /* vicino sopra      */
     const _bc = (v) => typeof v === 'string' ? v : '#000000';
     const sh = [];
-    if (b.top)    sh.push(`inset 0 1px 0 0 ${_bc(b.top)}`);
-    if (b.right)  sh.push(`inset -1px 0 0 0 ${_bc(b.right)}`);
-    if (b.bottom) sh.push(`inset 0 -1px 0 0 ${_bc(b.bottom)}`);
-    if (b.left)   sh.push(`inset 1px 0 0 0 ${_bc(b.left)}`);
+    if (b.top && !bT.bottom)   sh.push(`inset 0 1px 0 0 ${_bc(b.top)}`);
+    if (b.right)               sh.push(`inset -1px 0 0 0 ${_bc(b.right)}`);
+    if (b.bottom)              sh.push(`inset 0 -1px 0 0 ${_bc(b.bottom)}`);
+    if (b.left && !bL.right)   sh.push(`inset 1px 0 0 0 ${_bc(b.left)}`);
     if (gridVisible) {
-      if (!b.right)  sh.push('inset -1px 0 0 0 #e0e0e0');
-      if (!b.bottom) sh.push('inset 0 -1px 0 0 #e0e0e0');
+      if (!b.right  && !bR.left) sh.push('inset -1px 0 0 0 #e0e0e0');
+      if (!b.bottom && !bB.top)  sh.push('inset 0 -1px 0 0 #e0e0e0');
     }
     TD.style.boxShadow = sh.join(', ') || '';
   },
@@ -2061,14 +2070,19 @@ function buildSvg(rMin, rMax, cMin, cMax) {
           `>${escapeXml(String(val))}</text>`;
       }
 
-      /* Custom borders */
+      /* Custom borders — stessa regola della vista: il lato condiviso fra due
+         celle è una sola linea, disegnata dalla cella di sinistra/sopra */
       const b   = cellBorders[r]?.[c] || {};
+      const bR  = cellBorders[r]?.[c + 1] || {};
+      const bB  = cellBorders[r + 1]?.[c] || {};
+      const bL  = cellBorders[r]?.[c - 1] || {};
+      const bT  = cellBorders[r - 1]?.[c] || {};
       const bc  = (v) => typeof v === 'string' ? v : '#000000';
       const bls = (v) => `stroke="${bc(v)}" stroke-width="${CBORD_W}" stroke-linecap="square"`;
-      if (b.top)    body += `<line x1="${xOff}"    y1="${yOff}"    x2="${xOff+CW}" y2="${yOff}"    ${bls(b.top)}/>`;
-      if (b.bottom) body += `<line x1="${xOff}"    y1="${yOff+CH}" x2="${xOff+CW}" y2="${yOff+CH}" ${bls(b.bottom)}/>`;
-      if (b.left)   body += `<line x1="${xOff}"    y1="${yOff}"    x2="${xOff}"    y2="${yOff+CH}" ${bls(b.left)}/>`;
-      if (b.right)  body += `<line x1="${xOff+CW}" y1="${yOff}"    x2="${xOff+CW}" y2="${yOff+CH}" ${bls(b.right)}/>`;
+      if (b.top && !bT.bottom) body += `<line x1="${xOff}"    y1="${yOff}"    x2="${xOff+CW}" y2="${yOff}"    ${bls(b.top)}/>`;
+      if (b.bottom)           body += `<line x1="${xOff}"    y1="${yOff+CH}" x2="${xOff+CW}" y2="${yOff+CH}" ${bls(b.bottom)}/>`;
+      if (b.left && !bL.right) body += `<line x1="${xOff}"    y1="${yOff}"    x2="${xOff}"    y2="${yOff+CH}" ${bls(b.left)}/>`;
+      if (b.right)            body += `<line x1="${xOff+CW}" y1="${yOff}"    x2="${xOff+CW}" y2="${yOff+CH}" ${bls(b.right)}/>`;
     }
   }
 
