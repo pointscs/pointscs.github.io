@@ -1900,6 +1900,12 @@ function getRowH(row) {
   return cellSize;
 }
 
+/* Get actual row height (configured px, without the 1px rendered border) */
+function getRowPx(row) {
+  try { const h = hot.getRowHeight(row); return (h > 0) ? h : cellSize; }
+  catch { return cellSize; }
+}
+
 /* Build SVG markup for the given cell range. Returns { svg, totalW, totalH }.
    Uses actual column widths and row heights, and respects per-cell alignment. */
 function buildSvg(rMin, rMax, cMin, cMax) {
@@ -2397,8 +2403,14 @@ function exportXLSX() {
   }
 
   ws['!ref']  = XLSX.utils.encode_range({ s: { r:0, c:0 }, e: { r: lastRow, c: lastCol } });
-  ws['!cols'] = Array.from({ length: lastCol + 1 }, (_, c) => ({ wch: Math.max(1, Math.round(getColW(c) / 7)) }));
-  ws['!rows'] = Array.from({ length: lastRow + 1 }, (_, r) => ({ hpt: Math.max(6, Math.round(getRowH(r) * 0.75)) }));
+  /* Dimensioni scritte nelle unità di Excel (non in quelle approssimate di SheetJS):
+     larghezza in caratteri con  px = width*7 + 5,  altezza in punti con  px = pt / 0.75.
+     Si usa il valore configurato (hot.getRowHeight), non l'altezza renderizzata dal DOM
+     che include 1px di bordo: così una cella quadrata resta quadrata anche nel file. */
+  ws['!cols'] = Array.from({ length: lastCol + 1 }, (_, c) =>
+    ({ width: Math.max(0, Math.round(((getColW(c) - 5) / 7) * 1e6) / 1e6) }));
+  ws['!rows'] = Array.from({ length: lastRow + 1 }, (_, r) =>
+    ({ hpt: Math.max(0.75, Math.round(getRowPx(r) * 0.75 * 1e4) / 1e4) }));
 
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'Sheet1');
@@ -2992,21 +3004,25 @@ function handleFileImport(file) {
           }
         }
 
-        /* Column widths */
+        /* Larghezze colonne — unità Excel: col.width è la larghezza grezza del file in
+           caratteri → px = width*7 + 5. Non si usano wpx/wch di SheetJS 1.2.0: usa
+           MDW=6 e salta il padding di 5px, quindi sottostima le colonne. */
         const nCols = hot.countCols();
         const nRows = hot.countRows();
         const cwArr = new Array(nCols).fill(cellSize);
         if (ws['!cols']) ws['!cols'].forEach((col, c) => {
           if (c >= nCols) return;
-          if (col.wpx)      cwArr[c] = col.wpx;
-          else if (col.wch) cwArr[c] = Math.round(col.wch * 7);
+          if (col.width != null)     cwArr[c] = Math.round(col.width * 7 + 5);
+          else if (col.wpx)          cwArr[c] = col.wpx;
+          else if (col.wch != null)  cwArr[c] = Math.round(col.wch * 7 + 5);
         });
-        /* Row heights */
+        /* Altezze righe — hpt è in punti; in lettura SheetJS mette in hpx lo stesso
+           valore non convertito, quindi si converte sempre pt → px (px = pt / 0.75). */
         const rhArr = new Array(nRows).fill(cellSize);
         if (ws['!rows']) ws['!rows'].forEach((row, r) => {
           if (r >= nRows || !row) return;
-          if (row.hpx)      rhArr[r] = row.hpx;
-          else if (row.hpt) rhArr[r] = Math.round(row.hpt / 0.75);
+          const pt = row.hpt != null ? row.hpt : row.hpx;
+          if (pt != null) rhArr[r] = Math.round(pt / 0.75);
         });
         hot.updateSettings({ colWidths: cwArr, rowHeights: rhArr, manualColumnResize: true, manualRowResize: true });
 
