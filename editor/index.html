@@ -284,6 +284,32 @@
     .fe-btn:hover { background: rgba(0,0,0,.08); color: #333; }
     .fe-btn.del:hover { color: #c62828; background: rgba(198,40,40,.1); }
 
+    /* ── Public sheets section (visibile anche senza login) ── */
+    .lib-section { border-top: 1px solid #eee; margin-top: 4px; padding-top: 2px; }
+    #file-list > .lib-section:first-child { border-top: none; margin-top: 0; padding-top: 0; }
+    .lib-section-header {
+      display: flex; align-items: center;
+      padding: 7px 8px 3px 10px;
+      font-size: 10px; font-weight: 600; text-transform: uppercase;
+      letter-spacing: .4px; color: #9aa0a6;
+      white-space: nowrap; user-select: none;
+    }
+    .lib-section-header .lib-refresh {
+      margin-left: auto; width: 20px; height: 20px;
+      border: none; background: transparent; border-radius: 3px;
+      color: #9aa0a6; cursor: pointer; padding: 0;
+      font-size: 12px; line-height: 1;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .lib-section-header .lib-refresh:hover { background: rgba(0,0,0,.06); color: #333; }
+    .lib-note { padding: 2px 10px 6px; font-size: 10px; color: #b0b0b0; line-height: 1.35; }
+    .file-entry .file-ext {
+      flex-shrink: 0; padding-left: 4px;
+      font-size: 9px; letter-spacing: .3px; text-transform: uppercase; color: #9aa0a6;
+    }
+    .file-entry.public:hover .file-ext { color: #666; }
+    .file-entry.public.active .file-ext { color: #1a73e8; }
+
     /* ── Right-edge library hover trigger ────────────────── */
     #lib-edge-trigger {
       position: fixed;
@@ -2939,25 +2965,30 @@ async function importOoxmlCellStyles(file, wb) {
   }
 }
 
-/* ── Import: detect format and load ── */
+/* ── Import: detect format and load (ritorna una Promise) ── */
 function handleFileImport(file) {
-  if (!file) return;
+  if (!file) return Promise.resolve();
   const name = file.name.toLowerCase();
 
   if (name.endsWith('.html') || name.endsWith('.htm')) {
     handleGoogleSheetsHtml(file);
-    return;
+    return Promise.resolve();
   }
 
   if (name.endsWith('.wsheet')) {
-    const reader = new FileReader();
-    reader.onload = async (e) => {
-      try { await loadWSheetText(e.target.result, file.name); }
-      catch (err) { showToast(`Error: ${err.message}`); }
-    };
-    reader.readAsText(file);
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onload = async (e) => {
+        try { await loadWSheetText(e.target.result, file.name); }
+        catch (err) { showToast(`Error: ${err.message}`); }
+        resolve();
+      };
+      reader.onerror = () => resolve();
+      reader.readAsText(file);
+    });
+  }
 
-  } else {
+  return new Promise((resolve) => {
     /* ── xlsx / ods / csv / xls: valori e dimensioni via SheetJS;
           stili xlsx/xlsm via parsing OOXML diretto (vedi importOoxmlCellStyles) ── */
     const reader = new FileReader();
@@ -3063,9 +3094,11 @@ function handleFileImport(file) {
       } catch (err) {
         showToast(`Error reading file: ${err.message}`);
       }
+      resolve();
     };
+    reader.onerror = () => resolve();
     reader.readAsArrayBuffer(file);
-  }
+  });
 }
 
 /* ── Wire buttons ── */
@@ -3097,7 +3130,8 @@ function openLibrary() {
   if (typeof currentUser !== 'undefined' && currentUser) {
     loadFirebaseLibrary();
   } else {
-    fileListEl.innerHTML = '<div style="padding:10px;color:#aaa;font-size:11px;">Login to access the library</div>';
+    /* Senza login: si vedono (e si aprono) i fogli pubblici di ./data/ */
+    loadPublicLibrary();
   }
 }
 
@@ -3285,9 +3319,7 @@ function logoutUser() {
   _clearPresence();
   auth.signOut().then(() => {
     showToast('Logged out.');
-    if (libraryOpen) {
-      fileListEl.innerHTML = '<div style="padding:10px;color:#aaa;font-size:11px;">Login to access the library</div>';
-    }
+    if (libraryOpen) loadPublicLibrary();   /* senza login: fogli pubblici di data/ */
   });
 }
 
@@ -3304,7 +3336,13 @@ document.getElementById('login-overlay').addEventListener('click', e => {
 });
 
 /* ─── Firebase Storage — Library ──────────────────────── */
+/* Elenco cloud (se loggati) + sotto sempre i fogli pubblici di ./data/ */
 async function loadFirebaseLibrary() {
+  try { await _renderCloudLibrary(); }
+  finally { await renderPublicSection(); }
+}
+
+async function _renderCloudLibrary() {
   if (!storage) { fileListEl.innerHTML = '<div style="padding:10px;color:#d32f2f;font-size:11px;">Firebase not available</div>'; return; }
   fileListEl.innerHTML = '<div style="padding:10px;color:#aaa;font-size:11px;">Loading…</div>';
   try {
@@ -3386,6 +3424,169 @@ async function loadFirebaseFile(filename, entryEl) {
   } catch (err) {
     showToast(`Error loading ${filename}: ${err.message}`);
   }
+}
+
+/* ═══════════════════════════════════════════════════════════
+   PUBLIC SHEETS IN ./data/  (visibili e apribili senza login)
+   Un sito statico non può listare una cartella, quindi l'elenco
+   arriva da:
+     1) API GitHub del repo (sempre aggiornato, cache 10 min)
+     2) fallback: manifest statico ./data/index.json
+   ═══════════════════════════════════════════════════════════ */
+const PUBLIC_DATA_DIR  = './data/';
+const PUBLIC_REPO      = 'pointscs/pointscs.github.io';
+const PUBLIC_REPO_DIR  = 'editor/data';
+const PUBLIC_EXTS      = ['wsheet', 'xlsx', 'xlsm', 'xls', 'csv', 'ods'];
+const PUBLIC_CACHE_KEY = 'points-public-sheets';
+const PUBLIC_CACHE_MS  = 10 * 60 * 1000;
+
+function _isPublicSheet(name) {
+  const m = /\.([a-z0-9]+)$/i.exec(String(name || ''));
+  return !!m && PUBLIC_EXTS.includes(m[1].toLowerCase());
+}
+
+function _cachePublicSheets(files) {
+  try { localStorage.setItem(PUBLIC_CACHE_KEY, JSON.stringify({ at: Date.now(), files })); } catch (_) {}
+}
+
+/* Nomi dei fogli nella cartella data/. null = elenco non disponibile. */
+async function listPublicSheets(force = false) {
+  if (!force) {
+    try {
+      const o = JSON.parse(localStorage.getItem(PUBLIC_CACHE_KEY) || 'null');
+      if (o && Array.isArray(o.files) && Date.now() - (o.at || 0) < PUBLIC_CACHE_MS) return o.files;
+    } catch (_) {}
+  }
+  const sortNames = arr => arr
+    .filter(_isPublicSheet)
+    .sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' }));
+
+  /* 1) API GitHub: sempre aggiornata */
+  try {
+    const r = await fetch(`https://api.github.com/repos/${PUBLIC_REPO}/contents/${PUBLIC_REPO_DIR}?ref=master`,
+                          { headers: { Accept: 'application/vnd.github+json' } });
+    if (r.ok) {
+      const arr = await r.json();
+      const files = sortNames((Array.isArray(arr) ? arr : [])
+        .filter(f => f && f.type === 'file')
+        .map(f => f.name));
+      _cachePublicSheets(files);
+      return files;
+    }
+  } catch (_) {}
+
+  /* 2) fallback: manifest statico */
+  try {
+    const r = await fetch(`${PUBLIC_DATA_DIR}index.json?t=${Date.now()}`, { cache: 'no-store' });
+    if (r.ok) {
+      const arr = await r.json();
+      const files = sortNames(Array.isArray(arr) ? arr : (arr && arr.files) || []);
+      _cachePublicSheets(files);
+      return files;
+    }
+  } catch (_) {}
+
+  return null;
+}
+
+function makePublicEntry(filename) {
+  const el = document.createElement('div');
+  el.className = 'file-entry public';
+  el.dataset.filename = filename;
+
+  const nameEl = document.createElement('span');
+  nameEl.className = 'file-entry-name';
+  nameEl.textContent = filename.replace(/\.[^.]+$/, '');
+  nameEl.title = `Open ${filename} (public)`;
+  el.appendChild(nameEl);
+
+  const extEl = document.createElement('span');
+  extEl.className = 'file-ext';
+  extEl.textContent = (filename.split('.').pop() || '').toLowerCase();
+  el.appendChild(extEl);
+
+  el.onclick = () => openPublicFile(filename, el);
+  return el;
+}
+
+/* Sezione "Public sheets" nel pannello Library (idempotente) */
+async function renderPublicSection(force = false) {
+  const old = fileListEl.querySelector('.lib-section.public');
+  if (old) old.remove();
+
+  const sec = document.createElement('div');
+  sec.className = 'lib-section public';
+
+  const head = document.createElement('div');
+  head.className = 'lib-section-header';
+  head.appendChild(document.createTextNode('Public sheets'));
+  const btn = document.createElement('button');
+  btn.className = 'lib-refresh';
+  btn.title = 'Refresh list';
+  btn.textContent = '↻';
+  btn.onclick = e => { e.stopPropagation(); renderPublicSection(true); };
+  head.appendChild(btn);
+  sec.appendChild(head);
+  fileListEl.appendChild(sec);
+
+  const files = await listPublicSheets(force);
+  if (!fileListEl.contains(sec)) return;      /* pannello ridisegnato nel frattempo */
+  if (files === null) {
+    const n = document.createElement('div');
+    n.className = 'lib-note';
+    n.textContent = 'Lista non disponibile.';
+    sec.appendChild(n);
+    return;
+  }
+  if (!files.length) {
+    const n = document.createElement('div');
+    n.className = 'lib-note';
+    n.textContent = 'Nessun foglio in data/.';
+    sec.appendChild(n);
+    return;
+  }
+  for (const f of files) sec.appendChild(makePublicEntry(f));
+
+  /* Per chi non è loggato: ricordiamo che i file cloud sono dietro login */
+  if (!currentUser) {
+    const n = document.createElement('div');
+    n.className = 'lib-note';
+    n.textContent = 'Log in to see your cloud files.';
+    sec.appendChild(n);
+  }
+}
+
+/* Library senza login: solo i fogli pubblici */
+async function loadPublicLibrary() {
+  fileListEl.innerHTML = '';
+  await renderPublicSection();
+}
+
+/* Apre un foglio pubblico (nessun login, nessun auto-save su Firebase) */
+async function openPublicFile(filename, entryEl) {
+  const url = PUBLIC_DATA_DIR + encodeURIComponent(filename);
+  showToast(`Opening ${filename}…`);
+  try {
+    const resp = await fetch(url, { cache: 'no-store' });
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    const blob = await resp.blob();
+    detachFromCloud();                 /* un foglio pubblico NON è un file cloud */
+    await handleFileImport(new File([blob], filename, { type: blob.type || 'application/octet-stream' }));
+    if (activeEntry && activeEntry !== entryEl) activeEntry.classList.remove('active');
+    activeEntry = entryEl || activeEntry;
+    if (entryEl) entryEl.classList.add('active');
+  } catch (err) {
+    showToast(`Error opening ${filename}: ${err.message}`);
+  }
+}
+
+/* Stacca il foglio corrente dal cloud (auto-save, presenza, versione) */
+function detachFromCloud() {
+  currentCloudFile = null;
+  _lastSavedHash   = null;
+  _openedVersion   = null;
+  try { _clearPresence(); } catch (_) {}
+  if (activeEntry) { activeEntry.classList.remove('active'); activeEntry = null; }
 }
 
 /* ─── Save in Cloud ───────────────────────────────────── */
