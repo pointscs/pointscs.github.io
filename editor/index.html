@@ -2980,6 +2980,10 @@ async function importOoxmlCellStyles(file, wb) {
 }
 
 /* ── Import: detect format and load (ritorna una Promise) ── */
+/* _quietImport: apertura silenziosa (template di avvio): niente toast,
+   niente nome file nella toolbar, baseline senza nome. */
+let _quietImport = false;
+
 function handleFileImport(file) {
   if (!file) return Promise.resolve();
   const name = file.name.toLowerCase();
@@ -3101,9 +3105,11 @@ function handleFileImport(file) {
         normalizeAutoStyles();
 
         hot.render();
-        setSheetName(file.name);
-        showToast(`Opened: ${file.name} (${wb.SheetNames[0]})`);
-        saveBaseline(file.name);
+        if (!_quietImport) {
+          setSheetName(file.name);
+          showToast(`Opened: ${file.name} (${wb.SheetNames[0]})`);
+        }
+        saveBaseline(_quietImport ? null : file.name);
         resetGlobalTab();
       } catch (err) {
         showToast(`Error reading file: ${err.message}`);
@@ -3181,11 +3187,33 @@ libEdgeTrigger.addEventListener('mouseleave', _scheduleLibClose);
 filePanel.addEventListener('mouseenter', _cancelLibClose);
 filePanel.addEventListener('mouseleave', _scheduleLibClose);
 
-/* ── Auto-load template on startup ── */
-fetch('./data/template.wsheet')
-  .then(r => { if (!r.ok) throw new Error(); return r.text(); })
-  .then(text => loadWSheetText(text, null).catch(() => {}))
-  .catch(() => {}); /* silently skip if file is missing */
+/* ── Auto-load template on startup ──
+   Foglio di default = ./data/template.xlsx (stili fedeli all'Excel).
+   Se manca o non si legge, fallback al vecchio ./data/template.wsheet.
+   Apertura "silenziosa": nessun toast e nome scheda vuoto, come prima. */
+async function loadStartupTemplate() {
+  try {
+    const r = await fetch('./data/template.xlsx', { cache: 'no-store' });
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    const blob = await r.blob();
+    _quietImport = true;
+    try {
+      await handleFileImport(new File([blob], 'template.xlsx', {
+        type: blob.type || 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      }));
+    } finally {
+      _quietImport = false;
+    }
+    return;
+  } catch (_) { /* template.xlsx assente: si prova il .wsheet */ }
+
+  try {
+    const r = await fetch('./data/template.wsheet', { cache: 'no-store' });
+    if (!r.ok) throw new Error();
+    await loadWSheetText(await r.text(), null);
+  } catch (_) { /* nessun template: si parte con la griglia vuota */ }
+}
+loadStartupTemplate();
 
 /* firebaseConfig è caricato da firebase-config.js (esterno, gitignored) */
 
