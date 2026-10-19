@@ -1992,26 +1992,33 @@ document.getElementById('btn-bord-a').onclick = () => {
   syncToolbar(sel[0][0], sel[0][1]);
 };
 
-/* Smart borders: draws a border only on the perimeter of each selected area,
-   leaving inner cells untouched (perimeter of a 3x3 selection = 8 boxes). */
+/* Smart borders: draws a border ONLY on the outer boundary of the union of
+   all selected cells. Works for any shape (rectangles, L/T shapes, multiple
+   disjoint areas): a side is drawn only when the neighbouring cell in that
+   direction is NOT selected. Inner edges never get a line, so a 3x3 square
+   is "8 boxes" and an L shape follows its own contour (notch included). */
 document.getElementById('btn-bord-smart').onclick = () => {
   const sel = hot.getSelected();
   if (!sel || !sel.length) return;
   pushUndo();
+
+  /* 1) union of every selected area → set of selected cells */
+  const set = new Set();
   for (const [r1, c1, r2, c2] of sel) {
-    const rMin = Math.min(r1, r2), rMax = Math.max(r1, r2);
-    const cMin = Math.min(c1, c2), cMax = Math.max(c1, c2);
-    for (let r = rMin; r <= rMax; r++) {
-      for (let c = cMin; c <= cMax; c++) {
-        const onEdge = r === rMin || r === rMax || c === cMin || c === cMax;
-        if (!onEdge) continue;
-        const b = getBordFmt(r, c);
-        if (r === rMin) b.top    = _bordColor;
-        if (r === rMax) b.bottom = _bordColor;
-        if (c === cMin) b.left   = _bordColor;
-        if (c === cMax) b.right  = _bordColor;
-      }
-    }
+    for (let r = Math.min(r1, r2); r <= Math.max(r1, r2); r++)
+      for (let c = Math.min(c1, c2); c <= Math.max(c1, c2); c++)
+        set.add(`${r}:${c}`);
+  }
+  const has = (r, c) => set.has(`${r}:${c}`);
+
+  /* 2) a side is external only when the neighbour is outside the union */
+  for (const key of set) {
+    const [r, c] = key.split(':').map(Number);
+    const b = getBordFmt(r, c);
+    if (!has(r - 1, c)) b.top    = _bordColor;
+    if (!has(r + 1, c)) b.bottom = _bordColor;
+    if (!has(r, c - 1)) b.left   = _bordColor;
+    if (!has(r, c + 1)) b.right  = _bordColor;
   }
   _isDirty = true;
   hot.render();
