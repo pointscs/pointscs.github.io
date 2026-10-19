@@ -542,43 +542,6 @@
   <button class="tb-btn" id="btn-paste" title="Paste (Ctrl+V)">&#128203;</button>
   <div class="tb-sep"></div>
 
-  <!-- Dimensione testo SELEZIONATO (per-cella, non globale) -->
-  <select class="tb-select" id="sel-size" style="width:58px;" title="Dimensione del testo selezionato">
-    <option value="">Size</option>
-    <option>8</option><option>9</option><option>10</option><option>11</option>
-    <option>12</option><option>13</option><option>14</option>
-    <option>16</option><option>18</option><option>20</option><option>22</option>
-    <option>24</option><option>28</option><option>32</option><option>36</option>
-    <option>48</option><option>72</option>
-  </select>
-
-  <!-- Peso font Montserrat (per-cella) -->
-  <select class="tb-select" id="sel-weight" style="width:104px;" title="Peso font Montserrat del testo selezionato">
-    <option value="">Weight</option>
-    <option value="100">Thin 100</option>
-    <option value="200">X-Light 200</option>
-    <option value="300">Light 300</option>
-    <option value="400">Normal 400</option>
-    <option value="500">Medium 500</option>
-    <option value="600">SemiBold 600</option>
-    <option value="700">Bold 700</option>
-    <option value="800">X-Bold 800</option>
-    <option value="900">Black 900</option>
-  </select>
-
-  <!-- Stile testo SELEZIONATO -->
-  <button class="tb-btn" id="btn-bold" title="Grassetto selezione (Ctrl+B)" style="font-weight:700;">B</button>
-  <button class="tb-btn" id="btn-italic" title="Corsivo selezione (Ctrl+I)" style="font-style:italic;">I</button>
-  <button class="tb-btn" id="btn-underline" title="Sottolineato selezione (Ctrl+U)" style="text-decoration:underline;">U</button>
-  <button class="tb-btn" id="btn-strike" title="Barrato selezione" style="text-decoration:line-through;">S</button>
-
-  <!-- Allineamento testo SELEZIONATO -->
-  <select class="tb-select" id="sel-align" style="width:86px;" title="Allineamento del testo selezionato">
-    <option value="center" selected>Center</option>
-    <option value="left">Left</option>
-    <option value="right">Right</option>
-  </select>
-
   <!-- Copia / incolla SOLO stile -->
   <button class="tb-btn" id="btn-copy-style" title="Copia lo stile di TUTTE le celle selezionate (mantiene la disposizione)">🖌 Copy style</button>
   <button class="tb-btn" id="btn-paste-style" title="Incolla lo stile sulla selezione (matrice relativa, ripetuta se serve)" disabled>📋 Paste style</button>
@@ -617,8 +580,6 @@
 
   <!-- Grid visibility toggle -->
   <button class="tb-btn active" id="btn-grid" title="Show/hide grid">&#9783; Grid</button>
-  <button class="tb-btn" id="btn-grid-minus" title="Decrease cell size" style="font-size:16px; padding:0 9px;">−</button>
-  <button class="tb-btn" id="btn-grid-plus"  title="Increase cell size" style="font-size:16px; padding:0 9px;">+</button>
   <button class="tb-btn" id="btn-style-tab" title="dev mode: pannello avanzato di stile. Con il pannello aperto il runner automatico (maiuscole 18/medium, numeri 16, altro 16 a destra) è disattivato e i parametri si modificano a mano.">&#9656; dev mode</button>
 
   <!-- Sheet name (centered) -->
@@ -1009,8 +970,8 @@ function _shiftColsInStores(startIdx, amount) {
 
 /* Declared here so afterRenderer can access them during initial render */
 let gridVisible  = true;
-let cellSize     = 36;
-let baseFontSize = 16; /* scales with cellSize */
+const cellSize     = 36;  /* dimensione celle fissa: il resize globale è stato rimosso */
+const baseFontSize = 16;  /* scales with cellSize */
 
 /* Griglia minima sempre disponibile, qualunque file venga aperto:
    colonne da A fino ad AZ (26 + 26 = 52) e almeno 400 righe. */
@@ -1035,7 +996,7 @@ function padToMinGrid(src) {
    cella riceve automaticamente dimensione/peso/allineamento:
      • LETTERE MAIUSCOLE (A, B, ABC…) → 18px, grassetto medio 500, centrato
      • NUMERI (1, 2, 3.5…)            → 16px, peso normale 400, centrato
-     • "Left" / "Right"               → 16px, a destra e spostate di 3rem
+     • "Left" / "Right"               → 16px, a destra e spostate di 0,5rem
                                         dal bordo destro della cella
      • QUALSIASI ALTRO TESTO          → 16px, peso normale 400, a destra
    Con "dev mode" aperto il runner è disattivato: i parametri si
@@ -1044,8 +1005,8 @@ function padToMinGrid(src) {
 let devMode = false;
 const AUTO_STYLE_KEYS = ['fontSize', 'fontWeight', 'bold', 'align', 'padRight'];
 /* Offset da destra (px) applicato alle celle che contengono "Left"/"Right"
-   = 3rem con la root a 16px. Regolabile dal gruppo Left/Right del dev mode. */
-const WORDS_PAD_RIGHT = 3 * 16;
+   = 0,5rem con la root a 16px. Regolabile dal gruppo Left/Right del dev mode. */
+const WORDS_PAD_RIGHT = 0.5 * 16;
 
 function _autoStyleFor(value) {
   const s = (value === null || value === undefined) ? '' : String(value).trim();
@@ -1470,20 +1431,9 @@ hot.addHook('afterRender', () => {
 function syncToolbar(row, col) {
   const fmt = cellFormats[row]?.[col] || {};
 
-  /* Dimensione / peso / allineamento riflettono la cella attiva (selezione) */
-  document.getElementById('sel-size').value   = fmt.fontSize   || '';
-  const _w = fmt.fontWeight || (fmt.bold ? 700 : '');
-  document.getElementById('sel-weight').value = _w ? String(_w) : '';
-  document.getElementById('sel-align').value  = fmt.align      || 'center';
+  /* Colori testo/sfondo della cella attiva */
   document.getElementById('inp-color').value  = fmt.color      || '#000000';
   document.getElementById('inp-bg').value     = fmt.bgColor    || '#ffffff';
-
-  /* Stile testo selezione: evidenzia pulsanti attivi */
-  const _isBold = !!(fmt.fontWeight >= 700 || fmt.bold);
-  document.getElementById('btn-bold').classList.toggle('active', _isBold);
-  document.getElementById('btn-italic').classList.toggle('active', !!fmt.italic);
-  document.getElementById('btn-underline').classList.toggle('active', !!fmt.underline);
-  document.getElementById('btn-strike').classList.toggle('active', !!fmt.strike);
 
   /* Border buttons reflect anchor cell's current state */
   const bfmt = cellBorders[row]?.[col] || {};
@@ -1524,32 +1474,9 @@ function updateStatus() {
 
 /* ═══════════════════════════════════════════════════════════
    TOOLBAR WIRING
+   (i controlli di stile testo per-selezione sono stati rimossi:
+    lo stile arriva dal runner automatico o dal pannello dev mode)
 ═══════════════════════════════════════════════════════════ */
-/* Dimensione / peso / allineamento = SOLO testo selezionato (per-cella) */
-document.getElementById('sel-size').onchange = (e) => {
-  const v = parseInt(e.target.value);
-  if (!v) return;
-  applyFmt({ fontSize: v });
-};
-document.getElementById('sel-weight').onchange = (e) => {
-  const v = parseInt(e.target.value);
-  if (!v) return;
-  /* Tieni sincronizzato anche il flag bold per compatibilità export/shortcut */
-  applyFmt({ fontWeight: v, bold: v >= 700 });
-};
-document.getElementById('sel-align').onchange = (e) => applyFmt({ align: e.target.value });
-/* Stile testo selezionato: B / I / U / S */
-document.getElementById('btn-bold').onclick = () => {
-  const sel = hot.getSelected();
-  if (!sel || !sel.length) return;
-  const cur = getFmt(sel[0][0], sel[0][1]);
-  const curW = cur.fontWeight || (cur.bold ? 700 : 400);
-  const nextBold = !(curW >= 700 || cur.bold);
-  applyFmt({ fontWeight: nextBold ? 700 : 400, bold: nextBold });
-};
-document.getElementById('btn-italic').onclick    = () => toggleFmt('italic');
-document.getElementById('btn-underline').onclick = () => toggleFmt('underline');
-document.getElementById('btn-strike').onclick    = () => toggleFmt('strike');
 
 /* ── Copia / incolla SOLO stile (format painter) ──
    Copia lo stile di TUTTE le celle selezionate conservando la loro
@@ -2298,17 +2225,6 @@ document.getElementById('btn-grid').onclick = () => {
   gridVisible = !gridVisible;
   document.getElementById('btn-grid').classList.toggle('active', gridVisible);
   hot.render();
-};
-
-document.getElementById('btn-grid-minus').onclick = () => {
-  cellSize     = Math.max(16, cellSize - 6);
-  baseFontSize = Math.round(cellSize * 16 / 36);
-  hot.updateSettings({ colWidths: cellSize, rowHeights: cellSize });
-};
-document.getElementById('btn-grid-plus').onclick = () => {
-  cellSize     = Math.min(150, cellSize + 6);
-  baseFontSize = Math.round(cellSize * 16 / 36);
-  hot.updateSettings({ colWidths: cellSize, rowHeights: cellSize });
 };
 
 /* Resize */
