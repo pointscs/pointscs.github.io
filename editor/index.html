@@ -580,7 +580,7 @@
 
   <!-- Grid visibility toggle -->
   <button class="tb-btn active" id="btn-grid" title="Show/hide grid">&#9783; Grid</button>
-  <button class="tb-btn" id="btn-style-tab" title="dev mode: pannello avanzato di stile. Con il pannello aperto il runner automatico è disattivato: il testo non viene corretto (left/right → Left/Right, lettera singola minuscola → MAIUSCOLA) e gli stili (maiuscole 18/medium, numeri 16, altro 16 a destra) si impostano a mano.">&#9656; dev mode</button>
+  <button class="tb-btn" id="btn-style-tab" title="dev mode: pannello avanzato di stile. Con il pannello aperto il runner automatico è disattivato: il testo non viene corretto (left/right → Left/Right, lettera singola minuscola → MAIUSCOLA) e non viene applicato l'allineamento automatico (Left/Right a destra, scritta corta ≤3 stile lettere centrata, testo >20 caratteri a sinistra).">&#9656; dev mode</button>
 
   <!-- Sheet name (centered) -->
   <div style="flex:1; min-width:8px;"></div>
@@ -997,11 +997,15 @@ function padToMinGrid(src) {
      • "left" / "right" (qualsiasi caso) → "Left" / "Right"
      • una SINGOLA lettera minuscola (a…z) → MAIUSCOLA (così eredita lo
        stile delle lettere)
-     • LETTERE MAIUSCOLE (A, B, ABC…) → 18px, grassetto medio 500, centrato
-     • NUMERI (1, 2, 3.5…)            → 16px, peso normale 400, centrato
-     • "Left" / "Right"               → 16px, a destra e spostate di 0,5rem
-                                        dal bordo destro della cella
-     • QUALSIASI ALTRO TESTO          → 16px, peso normale 400, a destra
+   REGOLE DI STILE (in ordine di priorità):
+     • "Left" / "Right"                → 16px, a destra e scostate di 0,5rem
+                                         dal bordo destro della cella
+     • testo LUNGO (> 20 caratteri)    → sempre a sinistra (16px, 18/500 se
+                                         tutto maiuscolo)
+     • NUMERI (1, 2, 3.5…)             → 16px, peso normale 400, centrati
+     • SCRITTE CORTE (≤ 3 caratteri) e
+       testo TUTTO MAIUSCOLO (A, ABC…) → 18px, grassetto medio 500, centrate
+     • qualsiasi ALTRO TESTO (4…20)    → 16px, peso normale 400, a destra
    Con "dev mode" aperto il runner è disattivato: testo e parametri
    restano esattamente come scritti/del documento.
 ═══════════════════════════════════════════════════════════ */
@@ -1010,16 +1014,33 @@ const AUTO_STYLE_KEYS = ['fontSize', 'fontWeight', 'bold', 'align', 'padRight'];
 /* Offset da destra (px) applicato alle celle che contengono "Left"/"Right"
    = 0,5rem con la root a 16px. Regolabile dal gruppo Left/Right del dev mode. */
 const WORDS_PAD_RIGHT = 0.5 * 16;
+const SHORT_TEXT_LEN  = 3;    /* ≤ 3 caratteri → stile "lettere" (18/500), centrato */
+const LONG_TEXT_LEN   = 20;   /* > 20 caratteri → sempre allineato a sinistra */
 
 function _autoStyleFor(value) {
   const s = (value === null || value === undefined) ? '' : String(value).trim();
   if (!s) return null;                                   /* cella vuota */
-  if (/^[A-ZÀ-ÖØ-Þ]+$/.test(s))                          /* solo maiuscole */
-    return { fontSize: 18, fontWeight: 500, bold: false, align: 'center', padRight: 0 };
-  if (/^[+-]?\d+([.,]\d+)?$/.test(s))                    /* solo un numero */
-    return { fontSize: 16, fontWeight: 400, bold: false, align: 'center', padRight: 0 };
-  if (/^(left|right)$/i.test(s))                         /* "Left"/"Right" */
+
+  /* "Left"/"Right": a destra, scostate dal bordo destro della cella */
+  if (/^(left|right)$/i.test(s))
     return { fontSize: 16, fontWeight: 400, bold: false, align: 'right', padRight: WORDS_PAD_RIGHT };
+
+  /* TESTO LUNGO (> 20 caratteri): sempre a sinistra */
+  if (s.length > LONG_TEXT_LEN) {
+    const upper = /^[A-ZÀ-ÖØ-Þ]+$/.test(s);
+    return { fontSize: upper ? 18 : 16, fontWeight: upper ? 500 : 400, bold: false, align: 'left', padRight: 0 };
+  }
+
+  /* NUMERI (1, 2, 3.5…): 16px, peso normale 400, centrati */
+  if (/^[+-]?\d+([.,]\d+)?$/.test(s))
+    return { fontSize: 16, fontWeight: 400, bold: false, align: 'center', padRight: 0 };
+
+  /* SCRITTE CORTE (≤ 3 caratteri) e testo TUTTO MAIUSCOLO:
+     stesso stile delle lettere singole → 18px, medio 500, centrate */
+  if (s.length <= SHORT_TEXT_LEN || /^[A-ZÀ-ÖØ-Þ]+$/.test(s))
+    return { fontSize: 18, fontWeight: 500, bold: false, align: 'center', padRight: 0 };
+
+  /* QUALSIASI ALTRO TESTO (4…20 caratteri): 16px, peso normale 400, a destra */
   return { fontSize: 16, fontWeight: 400, bold: false, align: 'right', padRight: 0 };
 }
 
@@ -1619,7 +1640,9 @@ function _cellCategory(value) {
   if (!s) return null;
   if (/^(left|right)$/i.test(s)) return 'words';
   if (!isNaN(Number(s))) return 'numbers';
-  if (/^[A-Za-zÀ-ÖØ-öø-ÿ]+$/.test(s)) return 'letters';
+  /* Lettere (anche minuscole) e scritto corte (≤ 3 caratteri): il runner dà
+     loro lo stesso stile, quindi il gruppo "Letters" le comprende tutte. */
+  if (s.length <= SHORT_TEXT_LEN || /^[A-Za-zÀ-ÖØ-öø-ÿ]+$/.test(s)) return 'letters';
   return null;
 }
 
