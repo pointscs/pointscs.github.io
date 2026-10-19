@@ -766,6 +766,19 @@
       <option value="center">Center</option>
       <option value="right">Right</option>
     </select>
+    <select class="tb-select" id="gwr-padr" style="width:80px;" title="Scostamento dal bordo destro (padding-right) di tutte le celle Left/Right">
+      <option value="" selected>Pad R</option>
+      <option value="0">0 rem</option>
+      <option value="0.5">0.5 rem</option>
+      <option value="1">1 rem</option>
+      <option value="1.5">1.5 rem</option>
+      <option value="2">2 rem</option>
+      <option value="2.5">2.5 rem</option>
+      <option value="3">3 rem</option>
+      <option value="4">4 rem</option>
+      <option value="5">5 rem</option>
+      <option value="6">6 rem</option>
+    </select>
     <div class="color-wrap" title="Colore testo di tutte le celle Left/Right">
       <span class="color-label">A</span>
       <input type="color" class="color-swatch" id="gwr-color" value="#000000">
@@ -1022,21 +1035,28 @@ function padToMinGrid(src) {
    cella riceve automaticamente dimensione/peso/allineamento:
      • LETTERE MAIUSCOLE (A, B, ABC…) → 18px, grassetto medio 500, centrato
      • NUMERI (1, 2, 3.5…)            → 16px, peso normale 400, centrato
+     • "Left" / "Right"               → 16px, a destra e spostate di 3rem
+                                        dal bordo destro della cella
      • QUALSIASI ALTRO TESTO          → 16px, peso normale 400, a destra
    Con "dev mode" aperto il runner è disattivato: i parametri si
    modificano a mano (controlli per selezione e tab globale).
 ═══════════════════════════════════════════════════════════ */
 let devMode = false;
-const AUTO_STYLE_KEYS = ['fontSize', 'fontWeight', 'bold', 'align'];
+const AUTO_STYLE_KEYS = ['fontSize', 'fontWeight', 'bold', 'align', 'padRight'];
+/* Offset da destra (px) applicato alle celle che contengono "Left"/"Right"
+   = 3rem con la root a 16px. Regolabile dal gruppo Left/Right del dev mode. */
+const WORDS_PAD_RIGHT = 3 * 16;
 
 function _autoStyleFor(value) {
   const s = (value === null || value === undefined) ? '' : String(value).trim();
   if (!s) return null;                                   /* cella vuota */
   if (/^[A-ZÀ-ÖØ-Þ]+$/.test(s))                          /* solo maiuscole */
-    return { fontSize: 18, fontWeight: 500, bold: false, align: 'center' };
+    return { fontSize: 18, fontWeight: 500, bold: false, align: 'center', padRight: 0 };
   if (/^[+-]?\d+([.,]\d+)?$/.test(s))                    /* solo un numero */
-    return { fontSize: 16, fontWeight: 400, bold: false, align: 'center' };
-  return { fontSize: 16, fontWeight: 400, bold: false, align: 'right' };
+    return { fontSize: 16, fontWeight: 400, bold: false, align: 'center', padRight: 0 };
+  if (/^(left|right)$/i.test(s))                         /* "Left"/"Right" */
+    return { fontSize: 16, fontWeight: 400, bold: false, align: 'right', padRight: WORDS_PAD_RIGHT };
+  return { fontSize: 16, fontWeight: 400, bold: false, align: 'right', padRight: 0 };
 }
 
 /* Applica (o rimuove, se la cella è vuota) i parametri auto alla cella.
@@ -1051,9 +1071,13 @@ function _applyAutoStyle(r, c, value) {
     if (changed && !Object.keys(cur).length) delete cellFormats[r][c];
     return changed;
   }
-  if (cur && AUTO_STYLE_KEYS.every(k => cur[k] === spec[k])) return false;
+  if (cur && AUTO_STYLE_KEYS.every(k => k === 'padRight'
+        ? ((cur[k] || 0) === spec[k])      /* assente ≡ 0: non riscrivere le celle già pulite */
+        : (cur[k] === spec[k]))) return false;
   if (!cellFormats[r]) cellFormats[r] = {};
-  cellFormats[r][c] = Object.assign({}, cur || {}, spec);
+  const next = Object.assign({}, cur || {}, spec);
+  if (!next.padRight) delete next.padRight;   /* 0 = nessuno scostamento → non memorizzato */
+  cellFormats[r][c] = next;
   return true;
 }
 
@@ -1303,7 +1327,10 @@ const hot = new Handsontable(document.getElementById('sheet'), {
         _inner.style.left = '0'; _inner.style.right = 'auto';
         _inner.style.transform = 'translateY(-50%)';
       } else if (_align === 'right') {
-        _inner.style.left = 'auto'; _inner.style.right = '0';
+        /* padRight = scostamento dal bordo destro della cella (es. 3rem per
+           le celle "Left"/"Right"): il blocco testo viene ancorato più a
+           sinistra del bordo destro. */
+        _inner.style.left = 'auto'; _inner.style.right = (fmt?.padRight || 0) + 'px';
         _inner.style.transform = 'translateY(-50%)';
       } else {
         _inner.style.left = '50%'; _inner.style.right = 'auto';
@@ -1686,6 +1713,15 @@ function wireGlobalGroup(key) {
     const n = applyGlobal(key, { align: e.target.value });
     if (n) showToast(`${_glabel[key]} align ${e.target.value} — ${n} cells.`);
   };
+  /* Pad R (scostamento dal bordo destro) — presente solo nel gruppo Left/Right */
+  const _padr = gid('padr');
+  if (_padr) _padr.onchange = (e) => {
+    if (e.target.value === '') return;
+    const rem = parseFloat(e.target.value);
+    const px  = Math.round(rem * 16);
+    const n = applyGlobal(key, { padRight: px });
+    if (n) showToast(`${_glabel[key]} pad right ${rem}rem (${px}px) — ${n} cells.`);
+  };
   for (const prop of ['bold', 'italic', 'underline', 'strike'])
     gid(prop).onclick = () => toggleGlobal(key, prop);
   /* 'change' (non 'input'): un solo undo per scelta colore */
@@ -1709,6 +1745,8 @@ function resetGlobalTab() {
     document.getElementById(p + '-align').value = '';
     document.getElementById(p + '-color').value = '#000000';
     document.getElementById(p + '-bg').value = '#ffffff';
+    const _padrEl = document.getElementById(p + '-padr');
+    if (_padrEl) _padrEl.value = '';
     for (const prop of ['bold', 'italic', 'underline', 'strike'])
       document.getElementById(p + '-' + prop).classList.remove('active');
   }
@@ -1973,7 +2011,7 @@ function buildSvg(rMin, rMax, cMin, cMax) {
       const val = hot.getDataAtCell(r, c);
       if (val !== null && val !== undefined && val !== '') {
         const tx     = align === 'left'  ? xOff + PAD
-                     : align === 'right' ? xOff + CW - PAD
+                     : align === 'right' ? xOff + CW - PAD - (fmt.padRight || 0)
                      : xOff + CW / 2;
         const anchor = align === 'left'  ? 'start'
                      : align === 'right' ? 'end'
