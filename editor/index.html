@@ -1057,6 +1057,25 @@ function runAutoStyle(changes) {
   return changed;
 }
 
+/* Normalizza con il runner TUTTO il contenuto già presente nella griglia.
+   Usato all'apertura di un documento (file, template, cloud…). Con dev mode
+   aperto non fa nulla: gli stili restano quelli del documento.
+   Ritorna il numero di celle riadattate. */
+function normalizeAutoStyles() {
+  if (devMode) return 0;
+  const data = hot.getData();
+  let n = 0;
+  for (let r = 0; r < data.length; r++) {
+    const row = data[r] || [];
+    for (let c = 0; c < row.length; c++) {
+      const v = row[c];
+      if (v === null || v === undefined || v === '') continue;
+      if (_applyAutoStyle(r, c, v)) n++;
+    }
+  }
+  return n;
+}
+
 /* ═══════════════════════════════════════════════════════════
    UNDO / REDO STACKS
    Each entry: { cells: [{r,c,value}], formats: {}, borders: {} }
@@ -2451,6 +2470,11 @@ async function loadWSheetText(text, name, opts = {}) {
     manualRowResize:    true,
   });
 
+  /* Runner: adatta tutto il contenuto già presente (lettere/numeri/altro)
+     prima di fissare il baseline, così anche REVERT ripristina lo stato
+     normalizzato. Disattivato con dev mode aperto. */
+  normalizeAutoStyles();
+
   hot.render(); /* single render — afterRenderer applies formats + borders for visible cells */
   _isDirty = false;
   document.getElementById('st-msg').textContent = '';
@@ -2678,6 +2702,7 @@ function handleGoogleSheetsHtml(file) {
         for (const [c, bfmt] of Object.entries(cols)) cellBorders[r][c] = bfmt;
       }
 
+      normalizeAutoStyles();
       hot.render(); /* single render */
       setSheetName(file.name);
       const borderTotal = Object.values(newBorders).reduce((n, cols) => n + Object.keys(cols).length, 0);
@@ -2987,6 +3012,10 @@ function handleFileImport(file) {
 
         /* Stili per xlsx/xlsm: parsing OOXML diretto (sovrascrive il best-effort SheetJS) */
         await importOoxmlCellStyles(file, wb);
+
+        /* Runner: normalizza il contenuto aperto (lettere/numeri/altro).
+           Con dev mode aperto resta tutto com'è nel file. */
+        normalizeAutoStyles();
 
         hot.render();
         setSheetName(file.name);
