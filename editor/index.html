@@ -1311,6 +1311,32 @@ hot.addHook('afterUpdateSettings', () => {
 });
 
 /* ═══════════════════════════════════════════════════════════
+   TESTO IN OVERFLOW SOPRA LA CELLA A FIANCO
+   HOT disegna ogni cella con sfondo bianco e le celle successive
+   coprono quelle precedenti: il testo più largo della colonna
+   (es. "right" in una cella stretta) finiva sotto lo sfondo bianco
+   della cella a destra e spariva. Alziamo con uno z-index la cella
+   che va in overflow, così il testo che sborda viene dipinto sopra
+   il vicino. Le letture sono raggruppate prima delle scritture,
+   quindi costa un solo layout per render.
+═══════════════════════════════════════════════════════════ */
+hot.addHook('afterRender', () => {
+  const root = hot.rootElement;
+  if (!root) return;
+  const tds = root.querySelectorAll('td');
+  const lifted = []; /* pass di sola lettura → un solo layout */
+  for (let i = 0; i < tds.length; i++) {
+    const td = tds[i];
+    const inner = td.firstElementChild;
+    if (inner && inner.classList.contains('cell-inner') && inner.offsetWidth > td.clientWidth + 1) {
+      lifted.push(td);
+    }
+  }
+  for (const td of tds) if (td.style.zIndex) td.style.zIndex = '';
+  for (const td of lifted) td.style.zIndex = '2';
+});
+
+/* ═══════════════════════════════════════════════════════════
    FORMULA BAR
 ═══════════════════════════════════════════════════════════ */
 /* ═══════════════════════════════════════════════════════════
